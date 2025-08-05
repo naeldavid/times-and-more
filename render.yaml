@@ -1,9 +1,13 @@
 services:
   - type: web
-    name: times-and-more
+    name: prayer-times
     runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --worker-class sync
+    buildCommand: |
+      pip install -r requirements.txt
+    startCommand: |
+      gunicorn --bind 0.0.0.0:$PORT app:app
     envVars:
+      - key: PORT
+        value: 10000
       - key: FLASK_ENV
         value: production
