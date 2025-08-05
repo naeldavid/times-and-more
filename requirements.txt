@@ -1,0 +1,10 @@
+# Your existing libraries (kept exactly as you want them)
+Flask
+requests
+hijridate
+ephem
+
+# REQUIRED additions for Render production deployment
+gunicorn==20.1.0
+whitenoise==6.6.0
+python-dotenv==1.0.0
