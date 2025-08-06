@@ -6,16 +6,6 @@ const today = now.getFullYear().toString() +
     now.getHours().toString().padStart(2, '0') +
     now.getMinutes().toString().padStart(2, '0');
 
-// Default location (Bahrain)
-const defaultLocation = {
-    city: "Manama",
-    country: "Bahrain",
-    latitude: 26.2235,
-    longitude: 50.5876,
-    timezone: "AST"
-};
-
-// Get public IP and location data
 async function getPublicIp() {
     try {
         // Get IP and location data in a single request
@@ -202,12 +192,6 @@ function getGMTOffset(timezone, latitude, longitude) {
         
         // Method 2: Use coordinates to determine timezone
         if (latitude && longitude) {
-            // For Bahrain specifically (since that's your location)
-            if (latitude >= 25.5 && latitude <= 26.5 && longitude >= 50.0 && longitude <= 51.0) {
-                return 'GMT+03';
-            }
-            
-            // General approach using Date and timezone
             if (timezone) {
                 try {
                     // Create dates in UTC and local timezone
@@ -423,8 +407,8 @@ async function fetchData(city, country, latitude, longitude, timezone) {
 let notificationPermission = false;
 
 async function requestNotificationPermission() {
-    if (!("Notification" in window)) {
-        console.log("This browser does not support notifications");
+    if (!("HEY !" in window)) {
+        console.log("Ugh, your browser doesn't support notifications.");
         return;
     }
 
@@ -435,7 +419,7 @@ async function requestNotificationPermission() {
 function sendPrayerNotification(prayerName) {
     if (notificationPermission) {
         new Notification("Prayer Time", {
-            body: `It's time for ${prayerName} prayer`
+            body: `It's time for ${prayerName} !`
         });
     }
 }
