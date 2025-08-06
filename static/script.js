@@ -15,15 +15,37 @@ const defaultLocation = {
 	timezone: "AST"
 };
 
-// Get public IP
+// Get public IP and location data
 async function getPublicIp() {
 	try {
-		const response = await fetch('https://api.ipify.org?format=json');
+		// Get IP and location data in a single request
+		const response = await fetch('https://ip.guide');
 		const data = await response.json();
-		return data.ip;
+		console.log("IP and location data:", data);
+		
+		// Check if we got valid data
+		if (!data) {
+			throw new Error('Could not get location data');
+		}
+		
+		// Extract location data with fallbacks to default values
+		return {
+			city: data.location.city || defaultLocation.city,
+			country: data.location.country || defaultLocation.country,
+			latitude: parseFloat(data.location.latitude || defaultLocation.latitude),
+			longitude: parseFloat(data.location.longitude || defaultLocation.longitude ),
+			timezone: data.location.timezone || defaultLocation.timezone
+		};
 	} catch (error) {
-		console.error('Error getting public IP:', error);
-		return null;
+		console.error('Error getting location data:', error);
+		// Return default location if there's an error
+		return {
+			city: defaultLocation.city,
+			country: defaultLocation.country,
+			latitude: defaultLocation.latitude,
+			longitude: defaultLocation.longitude,
+			timezone: defaultLocation.timezone
+		};
 	}
 }
 
@@ -350,18 +372,19 @@ document.addEventListener('DOMContentLoaded', async function() {
 	console.log("DOM loaded, initializing application...");
 	
 	try {
-		// Get public IP for logging purposes
-		const ip = await getPublicIp();
-		console.log("IP address obtained:", ip);
+		// Get location data from IP
+		console.log("Fetching location data from IP address...");
+		const locationData = await getPublicIp();
+		console.log("Location data obtained:", locationData);
 		
-		// Initial data load using default location
-		console.log("Loading data for default location:", defaultLocation);
+		// Load data with location information
+		console.log("Loading data for location:", locationData);
 		await fetchData(
-			defaultLocation.city,
-			defaultLocation.country,
-			defaultLocation.latitude,
-			defaultLocation.longitude,
-			defaultLocation.timezone
+			locationData.city,
+			locationData.country,
+			locationData.latitude,
+			locationData.longitude,
+			locationData.timezone
 		);
 		
 		// Set up timers
@@ -376,6 +399,21 @@ document.addEventListener('DOMContentLoaded', async function() {
 		console.log("Application initialization complete");
 	} catch (error) {
 		console.error("Error during initialization:", error);
-		document.getElementById('loading').innerHTML = `<div class="error">Error loading data: ${error.message}</div>`;
+		
+		// Create and display error message in UI
+		const container = document.querySelector('.container');
+		const errorDiv = document.createElement('div');
+		errorDiv.style.backgroundColor = '#ffdddd';
+		errorDiv.style.color = '#d00';
+		errorDiv.style.padding = '10px';
+		errorDiv.style.margin = '10px 0';
+		errorDiv.style.borderRadius = '8px';
+		errorDiv.textContent = `Error initializing application: ${error.message}`;
+		
+		// Insert after header
+		const header = document.querySelector('.header');
+		if (header && container) {
+			container.insertBefore(errorDiv, header.nextSibling);
+		}
 	}
 });
