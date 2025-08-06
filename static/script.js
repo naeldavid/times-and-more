@@ -404,25 +404,44 @@ async function fetchData(city, country, latitude, longitude, timezone) {
 }
 
 // Notification functionality
-let notificationPermission = false;
-
 async function requestNotificationPermission() {
-    if (!("HEY !" in window)) {
-        console.log("Ugh, your browser doesn't support notifications.");
-        return;
-    }
 
-    const permission = await Notification.requestPermission();
-    notificationPermission = permission === "granted";
+  if (!("Notification" in window)) {
+    console.log("This browser doesn't support notifications.");
+    return false;
+  }
+
+
+  if (Notification.permission === "granted") {
+    return true;
+  }
+
+
+  const permission = await Notification.requestPermission();
+  return permission === "granted";
 }
 
-function sendPrayerNotification(prayerName) {
-    if (notificationPermission) {
-        new Notification("Prayer Time", {
-            body: `It's time for ${prayerName} !`
-        });
+async function sendPrayerNotification(prayerName) {
+
+  const hasPermission = await requestNotificationPermission();
+  
+  if (hasPermission) {
+    try {
+      new Notification("Prayer Time", {
+        body: `It's time for ${prayerName}!`,
+        icon: 'sujud.svg'
+      });
+    } catch (error) {
+      console.error("Failed to show notification:", error);
     }
+  } else {
+    console.log("Cannot show notification - permission not granted");
+  }
 }
+
+document.getElementById('notify-btn').addEventListener('click', () => {
+  sendPrayerNotification("this works !");
+});
 
 function checkPrayerTime() {
     const now = new Date();
