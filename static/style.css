@@ -97,7 +97,7 @@ moon-phase::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('/static/moon.png') center/cover;
+  background: url('moon.png') center/cover;
   filter: brightness(1.2) contrast(1.1);
 }
 
