@@ -403,45 +403,26 @@ async function fetchData(city, country, latitude, longitude, timezone) {
     }
 }
 
-// Notification functionality
+
+let notificationPermission = false;
+
 async function requestNotificationPermission() {
-
-  if (!("Notification" in window)) {
-    console.log("This browser doesn't support notifications.");
-    return false;
-  }
-
-
-  if (Notification.permission === "granted") {
-    return true;
-  }
-
-
-  const permission = await Notification.requestPermission();
-  return permission === "granted";
-}
-
-async function sendPrayerNotification(prayerName) {
-
-  const hasPermission = await requestNotificationPermission();
-  
-  if (hasPermission) {
-    try {
-      new Notification("Prayer Time", {
-        body: `It's time for ${prayerName}!`,
-        icon: 'sujud.svg'
-      });
-    } catch (error) {
-      console.error("Failed to show notification:", error);
+    if (!("HEY !" in window)) {
+        console.log("Ugh, your browser doesn't support notifications.");
+        return;
     }
-  } else {
-    console.log("Cannot show notification - permission not granted");
-  }
+
+    const permission = await Notification.requestPermission();
+    notificationPermission = permission === "granted";
 }
 
-document.getElementById('notify-btn').addEventListener('click', () => {
-  sendPrayerNotification("this works !");
-});
+function sendPrayerNotification(prayerName) {
+    if (notificationPermission) {
+        new Notification("Prayer Time", {
+            body: `It's time for ${prayerName} !`
+        });
+    }
+}
 
 function checkPrayerTime() {
     const now = new Date();
@@ -452,7 +433,7 @@ function checkPrayerTime() {
         'Dhuhr': document.querySelector('#dhuhr .time').textContent,
         'Asr': document.querySelector('#asr .time').textContent,
         'Maghrib': document.querySelector('#maghrib .time').textContent,
-        'Isha': document.querySelector('#isha .time').textContent
+        'Isha': document.querySelector('#isha .time').textContentss
     };
 
     for (const [name, time] of Object.entries(prayers)) {
