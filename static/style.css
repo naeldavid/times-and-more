@@ -44,6 +44,25 @@ body {
 	letter-spacing: 0.5px;
 }
 
+.language-selector {
+	text-align: center;
+	margin-bottom: 20px;
+}
+
+.language-selector select {
+	background: rgba(255, 255, 255, 0.2);
+	color: white;
+	border: none;
+	padding: 10px;
+	border-radius: 10px;
+	font-size: 1em;
+}
+
+.language-selector select option {
+	background: #333;
+	color: white;
+}
+
 .header::after {
 	content: '';
 	display: block;
@@ -84,75 +103,54 @@ body {
 }
 
 moon-phase {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  position: relative;
-  overflow: hidden;
-  display: inline-block;
-  background: #1a1a1a;
-}
-
-moon-phase::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: url('moon.png') center/cover;
-  filter: brightness(1.2) contrast(1.1);
-}
-
-moon-phase::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: #000;
-  border-radius: var(--_btlr, 0) var(--_btrr, 0) var(--_bbrr, 0) var(--_bblr, 0);
-  filter: var(--moon-phase-mask-filter, blur(var(--moon-phase-blur, 0px)));
-  height: 100%;
-  inset-inline: var(--_ii, auto 0);
-  opacity: var(--moon-phase-mask-opacity, .85);
-  width: var(--_w);
-}
-
-/* Phase-specific styles */
-[phase*="first quarter"],
-[phase*="waxing"] {
-  --_ii: 0 auto;
-}
-
-[phase*="crescent"],
-[phase*="first quarter"],
-[phase*="waxing"] {
-  --_bblr: 100%;
-  --_btlr: 100%;
-}
-
-[phase*="crescent"],
-[phase*="last quarter"],
-[phase*="waning"] {
-  --_btrr: 100%;
-  --_bbrr: 100%;
-}
-
-[phase*="gibbous"]::after {
-  border-radius: 0;
-  width: 100%;
-}
-
-/* Correct mask direction */
-[phase="waxing gibbous"]::after {
-  mask: radial-gradient(circle at 0% 50%,
-    #0000 calc(100% - var(--_w)),
-    #000 calc(100% - var(--_w) + 1px + (2 * var(--moon-phase-blur))));
-}
-
-[phase="waning gibbous"]::after {
-  mask: radial-gradient(circle at 100% 50%,
-    #0000 calc(100% - var(--_w)),
-    #000 calc(100% - var(--_w) + 1px + (2 * var(--moon-phase-blur))));
-}
-
-
+	width: 50px;
+	height: 50px;
+	border-radius: 50%;
+	position: relative;
+	overflow: hidden;
+	display: inline-block;
+	background: #1a1a1a;
+  }
+  
+  moon-phase::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(145deg, #ccc, #999);
+	border-radius: 50%;
+	filter: brightness(1.2) contrast(1.1);
+  }
+  
+  moon-phase::after {
+	content: '';
+	position: absolute;
+	background: #000;
+	height: 100%;
+	opacity: 0.85;
+  }
+  
+  /* Waxing phases (right side illuminated) */
+  [phase*="Waxing"]::after {
+	right: 0;
+	border-radius: 100% 0 0 100%/50%;
+	width: calc(100% - var(--_w));
+  }
+  
+  /* Waning phases (left side illuminated) */
+  [phase*="Waning"]::after {
+	left: 0;
+	border-radius: 0 100% 100% 0/50%;
+	width: calc(100% - var(--_w));
+  }
+  
+  /* Full and New Moon */
+  [phase="Full Moon"]::after {
+	display: none;
+  }
+  
+  [phase="New Moon"]::after {
+	width: 100%;
+  }
 .dates {
 	display: flex;
 	justify-content: space-between;
