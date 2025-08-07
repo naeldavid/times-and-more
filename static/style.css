@@ -109,7 +109,7 @@ moon-phase {
 	position: relative;
 	overflow: hidden;
 	display: inline-block;
-	background: #1a1a1a;
+	background: #1a1a1a url('/static/moon.png') no-repeat center center;
   }
   
   moon-phase::before {
@@ -128,7 +128,7 @@ moon-phase {
 	height: 100%;
 	opacity: 0.85;
   }
-  
+
   /* Waxing phases (right side illuminated) */
   [phase*="Waxing"]::after {
 	right: 0;
