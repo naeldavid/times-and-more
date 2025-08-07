@@ -1,3 +1,12 @@
+// Default location fallback
+const defaultLocation = {
+    city: 'Manama',
+    country: 'Bahrain',
+    latitude: 26.2285,
+    longitude: 50.5860,
+    timezone: 'Asia/Bahrain'
+};
+
 // Current date and time
 const now = new Date();
 const today = now.getFullYear().toString() +
@@ -6,37 +15,48 @@ const today = now.getFullYear().toString() +
     now.getHours().toString().padStart(2, '0') +
     now.getMinutes().toString().padStart(2, '0');
 
+// Get location using navigator.geolocation instead of IP
 async function getPublicIp() {
-    try {
-        // Get IP and location data in a single request
-        const response = await fetch('https://ip.guide');
-        const data = await response.json();
-        console.log("IP and location data:", data);
-        
-        // Check if we got valid data
-        if (!data) {
-            throw new Error('Could not get location data');
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            console.error("Geolocation is not supported.");
+            resolve(defaultLocation);
+            return;
         }
-        
-        // Extract location data with fallbacks to default values
-        return {
-            city: data.location.city || defaultLocation.city,
-            country: data.location.country || defaultLocation.country,
-            latitude: parseFloat(data.location.latitude || defaultLocation.latitude),
-            longitude: parseFloat(data.location.longitude || defaultLocation.longitude),
-            timezone: data.location.timezone || defaultLocation.timezone
-        };
-    } catch (error) {
-        console.error('Error getting location data:', error);
-        // Return default location if there's an error
-        return {
-            city: defaultLocation.city,
-            country: defaultLocation.country,
-            latitude: defaultLocation.latitude,
-            longitude: defaultLocation.longitude,
-            timezone: defaultLocation.timezone
-        };
-    }
+
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const latitude = position.coords.latitude;
+                const longitude = position.coords.longitude;
+                let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || defaultLocation.timezone;
+                let city = defaultLocation.city;
+                let country = defaultLocation.country;
+
+                // Try reverse geocoding to get city/country names
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`);
+                    const data = await response.json();
+                    city = data.address?.city || data.address?.town || data.address?.village || defaultLocation.city;
+                    country = data.address?.country || defaultLocation.country;
+                } catch (e) {
+                    console.warn("Reverse geocoding failed:", e);
+                }
+
+                resolve({
+                    city,
+                    country,
+                    latitude,
+                    longitude,
+                    timezone
+                });
+            },
+            (error) => {
+                console.error("Geolocation error:", error);
+                resolve(defaultLocation);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
+        );
+    });
 }
 
 // Get prayer times
@@ -241,11 +261,58 @@ function getGMTOffset(timezone, latitude, longitude) {
             }
         }
         
-        
+        return 'GMT+03'; // Default fallback
     } catch (error) {
         console.error('Error getting GMT offset:', error);
-        return 'Error getting offset'; // Default for Bahrain
+        return 'GMT+03'; // Default for Bahrain
     }
+}
+
+// 🔔 Request notification permission on load
+if ('Notification' in window && Notification.permission !== 'granted') {
+    Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+            console.log("✅ Notifications enabled.");
+        } else {
+            console.warn("🚫 Notifications denied.");
+        }
+    });
+}
+
+// 🕒 Function to get time difference in ms
+function getTimeUntil(prayerTime) {
+    const now = new Date();
+    const [hour, minute] = prayerTime.split(':').map(Number);
+    const target = new Date(now);
+    target.setHours(hour, minute, 0, 0);
+    if (target < now) target.setDate(target.getDate() + 1);
+    return target - now;
+}
+
+// 🔔 Send a browser notification
+function sendPrayerNotification(prayerName) {
+    if (Notification.permission === 'granted') {
+        new Notification(`⏰ Time for ${prayerName}`, {
+            body: `It's time to pray ${prayerName}.`,
+            icon: "static/favicon.ico"
+        });
+    }
+}
+
+// ⏱️ Schedule a notification
+function schedulePrayerNotification(prayerName, timeStr) {
+    const msUntilPrayer = getTimeUntil(timeStr);
+    console.log(`⏳ ${prayerName} in ${Math.round(msUntilPrayer / 60000)} minutes`);
+    setTimeout(() => {
+        sendPrayerNotification(prayerName);
+    }, msUntilPrayer);
+}
+
+// 🕌 Schedule all prayers
+function scheduleAllPrayerNotifications(prayerTimes) {
+    Object.entries(prayerTimes).forEach(([name, time]) => {
+        schedulePrayerNotification(name, time);
+    });
 }
 
 // Update UI with data
@@ -287,6 +354,9 @@ function updateUI(data) {
     document.querySelector('#isha .time').textContent = prayerTimes['Isha'];
     console.log("Updated prayer times:", prayerTimes);
     
+    // Schedule notifications for all prayer times
+    scheduleAllPrayerNotifications(prayerTimes);
+    
     // Update next prayer calculation
     updateNextPrayer();
     console.log("UI update complete");
@@ -310,16 +380,18 @@ function updateNextPrayer() {
     
     for (const [name, element] of Object.entries(prayerElements)) {
         const timeText = element.querySelector('.time').textContent;
-        const [hours, minutes] = timeText.split(':').map(Number);
-        const prayerTime = new Date();
-        prayerTime.setHours(hours, minutes, 0, 0);
-        
-        if (prayerTime < now) prayerTime.setDate(prayerTime.getDate() + 1);
-        
-        const diff = prayerTime - now;
-        if (diff > 0 && diff < minDiff) {
-            minDiff = diff;
-            nextPrayer = name;
+        if (timeText && timeText !== '--:--') {
+            const [hours, minutes] = timeText.split(':').map(Number);
+            const prayerTime = new Date();
+            prayerTime.setHours(hours, minutes, 0, 0);
+            
+            if (prayerTime < now) prayerTime.setDate(prayerTime.getDate() + 1);
+            
+            const diff = prayerTime - now;
+            if (diff > 0 && diff < minDiff) {
+                minDiff = diff;
+                nextPrayer = name;
+            }
         }
     }
     
@@ -403,53 +475,13 @@ async function fetchData(city, country, latitude, longitude, timezone) {
     }
 }
 
-
-let notificationPermission = false;
-
-async function requestNotificationPermission() {
-    if (!("HEY !" in window)) {
-        console.log("Ugh, your browser doesn't support notifications.");
-        return;
-    }
-
-    const permission = await Notification.requestPermission();
-    notificationPermission = permission === "granted";
-}
-
-function sendPrayerNotification(prayerName) {
-    if (notificationPermission) {
-        new Notification("Prayer Time", {
-            body: `It's time for ${prayerName} !`
-        });
-    }
-}
-
-function checkPrayerTime() {
-    const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
-    const prayers = {
-        'Fajr': document.querySelector('#fajr .time').textContent,
-        'Dhuhr': document.querySelector('#dhuhr .time').textContent,
-        'Asr': document.querySelector('#asr .time').textContent,
-        'Maghrib': document.querySelector('#maghrib .time').textContent,
-        'Isha': document.querySelector('#isha .time').textContentss
-    };
-
-    for (const [name, time] of Object.entries(prayers)) {
-        if (currentTime === time) {
-            sendPrayerNotification(name);
-        }
-    }
-}
-
 // Initialize the app
 document.addEventListener('DOMContentLoaded', async function() {
     console.log("DOM loaded, initializing application...");
     
     try {
-        // Get location data from IP
-        console.log("Fetching location data from IP address...");
+        // Get location data using geolocation
+        console.log("Fetching location data using geolocation...");
         const locationData = await getPublicIp();
         console.log("Location data obtained:", locationData);
         
@@ -466,56 +498,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Set up timers
         console.log("Setting up timers for prayer updates");
         setInterval(updateNextPrayer, 60000); // Update countdown every minute
-        setInterval(checkPrayerTime, 60000); // Check for prayer times every minute
-        
-        // Request notification permission
-        // 🔔 Request notification permission on load
-if ('Notification' in window && Notification.permission !== 'granted') {
-    Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-            console.log("✅ Notifications enabled.");
-        } else {
-            console.warn("🚫 Notifications denied.");
-        }
-    });
-}
-
-// 🕒 Function to get time difference in ms
-function getTimeUntil(prayerTime) {
-    const now = new Date();
-    const [hour, minute] = prayerTime.split(':').map(Number);
-    const target = new Date(now);
-    target.setHours(hour, minute, 0, 0);
-    if (target < now) target.setDate(target.getDate() + 1);
-    return target - now;
-}
-
-// 🔔 Send a browser notification
-function sendPrayerNotification(prayerName) {
-    if (Notification.permission === 'granted') {
-        new Notification(`Time for ${prayerName}`, {
-            body: `It's time to pray ${prayerName}.`,
-            icon: "static/favicon.ico"
-        });
-    }
-}
-
-// ⏱️ Schedule a notification
-function schedulePrayerNotification(prayerName, timeStr) {
-    const msUntilPrayer = getTimeUntil(timeStr);
-    console.log(`⏳ ${prayerName} in ${Math.round(msUntilPrayer / 60000)} minutes`);
-    setTimeout(() => {
-        sendPrayerNotification(prayerName);
-    }, msUntilPrayer);
-}
-
-// 🕌 Schedule all prayers
-function scheduleAllPrayerNotifications(prayerTimes) {
-    Object.entries(prayerTimes).forEach(([name, time]) => {
-        schedulePrayerNotification(name, time);
-    });
-}
-
         
         console.log("Application initialization complete");
     } catch (error) {
