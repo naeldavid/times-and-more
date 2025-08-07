@@ -95,31 +95,39 @@ async function getPrayerTimes(latitude, longitude, timezone) {
 
 function calculateMoonPhase() {
     const date = new Date();
-    // Calculate moon age in days (0-29.53)
-    const lunarCycle = 29.53058867; // Average length of lunar cycle in days
-    const knownNewMoon = new Date('2000-01-06T18:14:00Z'); // Reference new moon
+    const lunarCycle = 29.53058867;
+    const knownNewMoon = new Date('2000-01-06T18:14:00Z');
     
-    // Calculate days since known new moon
     const daysSinceNewMoon = (date - knownNewMoon) / (1000 * 60 * 60 * 24);
-    const moonAge = daysSinceNewMoon % lunarCycle;
+    let moonAge = daysSinceNewMoon % lunarCycle;
+    if (moonAge < 0) moonAge += lunarCycle;
     
     // Calculate illumination percentage (0-100)
     let illumination = Math.round(50 * (1 - Math.cos(2 * Math.PI * moonAge / lunarCycle)));
     
     // Determine moon phase
     let phase;
-    if (moonAge < 1) phase = "New Moon";
-    else if (moonAge < 7.38) phase = "Waxing Crescent";
-    else if (moonAge < 8.38) phase = "First Quarter";
-    else if (moonAge < 14.77) phase = "Waxing Gibbous";
-    else if (moonAge < 15.77) phase = "Full Moon";
-    else if (moonAge < 22.15) phase = "Waning Gibbous";
-    else if (moonAge < 23.15) phase = "Last Quarter";
-    else phase = "Waning Crescent";
-    
-    // Ensure illumination matches phase
-    if (phase === "New Moon") illumination = 0;
-    else if (phase === "Full Moon") illumination = 100;
+    if (moonAge < 1) {
+        phase = "New Moon";
+        illumination = 0;
+    } else if (moonAge < 7.38) {
+        phase = "Waxing Crescent";
+    } else if (moonAge < 8.38) {
+        phase = "First Quarter";
+        illumination = 50;
+    } else if (moonAge < 14.77) {
+        phase = "Waxing Gibbous";
+    } else if (moonAge < 15.77) {
+        phase = "Full Moon";
+        illumination = 100;
+    } else if (moonAge < 22.15) {
+        phase = "Waning Gibbous";
+    } else if (moonAge < 23.15) {
+        phase = "Last Quarter";
+        illumination = 50;
+    } else {
+        phase = "Waning Crescent";
+    }
     
     return [phase, illumination];
 }
@@ -221,11 +229,19 @@ function updateUI(data) {
     document.getElementById('gregorian-date').textContent = `Gregorian: ${gregorianDate}`;
     document.getElementById('hijri-date').textContent = `Hijri: ${hijriDate}`;
     
-// In the updateUI function, replace the moon phase section with:
+	// Update moon phase
 	const moonPhase = document.getElementById('moon-phase');
-	moonPhase.style.setProperty('--illumination', illumination);
-	document.getElementById('moon-phase-text').innerHTML = 
-  `${currentPhase}<br>${illumination}% illuminated`;
+	const moonPhaseText = document.getElementById('moon-phase-text');
+	
+	if (moonPhase && moonPhaseText) {
+		moonPhase.setAttribute('phase', currentPhase);
+		moonPhase.style.setProperty('--illumination', `${illumination}%`);
+		moonPhaseText.innerHTML = `${currentPhase}<br>${illumination}% illuminated`;
+		console.log('Moon phase CSS variable set:', `--illumination: ${illumination}%`);
+		console.log("Updated moon phase:", currentPhase, illumination);
+	} else {
+		console.error('Moon phase elements not found');
+	}
     
     document.getElementById('qibla-direction').textContent = `${qiblaDirection}°`;
     document.getElementById('qibla-arrow').style.transform = `rotate(${qiblaDirection}deg)`;
