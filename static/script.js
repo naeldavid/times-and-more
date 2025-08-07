@@ -59,48 +59,70 @@ async function getPublicLocation() {
 
 async function getPrayerTimes(latitude, longitude, timezone) {
     try {
-        const url = `https://api.aladhan.com/v1/timings/${today}?latitude=${latitude}&longitude=${longitude}&timezone=${timezone}&method=4`;
+        // Use current date in YYYY-MM-DD format
+        const dateStr = now.getFullYear() + '-' + 
+                       (now.getMonth() + 1).toString().padStart(2, '0') + '-' + 
+                       now.getDate().toString().padStart(2, '0');
+        
+        const url = `https://api.aladhan.com/v1/timings/${dateStr}?latitude=${latitude}&longitude=${longitude}&method=4&timezonestring=${timezone}`;
         const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`API request failed with status ${response.status}`);
+        }
+        
         const data = await response.json();
         
-        if (data.status === 'OK') {
+        if (data.code === 200 && data.status === "OK") {
             return data.data.timings;
+        } else {
+            throw new Error(data.data.error || 'Unknown API error');
         }
-        return null;
     } catch (error) {
         console.error('Error getting prayer times:', error);
-        return null;
+        
+        // Fallback prayer times for Bahrain
+        return {
+            Fajr: "05:00",
+            Sunrise: "06:00",
+            Dhuhr: "12:00",
+            Asr: "15:00",
+            Maghrib: "18:00",
+            Isha: "19:30",
+        };
     }
 }
 
 function calculateMoonPhase() {
     const date = new Date();
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
+    // Calculate moon age in days (0-29.53)
+    const lunarCycle = 29.53058867; // Average length of lunar cycle in days
+    const knownNewMoon = new Date('2000-01-06T18:14:00Z'); // Reference new moon
     
-    let jd = 367 * year - Math.floor(7 * (year + Math.floor((month + 9) / 12)) / 4) - 
-            Math.floor(3 * (Math.floor((year + (month - 9) / 7) / 100) + 1) / 4) + 
-            Math.floor(275 * month / 9) + day + 1721028.5;
+    // Calculate days since known new moon
+    const daysSinceNewMoon = (date - knownNewMoon) / (1000 * 60 * 60 * 24);
+    const moonAge = daysSinceNewMoon % lunarCycle;
     
-    let refJd = 2451549.5; 
-    let moonAge = (jd - refJd) % 29.53;
-    let illumination = Math.round(moonAge / 29.53 * 100);
+    // Calculate illumination percentage (0-100)
+    let illumination = Math.round(50 * (1 - Math.cos(2 * Math.PI * moonAge / lunarCycle)));
     
+    // Determine moon phase
     let phase;
-    if (moonAge < 1.84566) phase = "New Moon";
-    else if (moonAge < 5.53699) phase = "Waxing Crescent";
-    else if (moonAge < 9.22831) phase = "First Quarter";
-    else if (moonAge < 12.91963) phase = "Waxing Gibbous";
-    else if (moonAge < 16.61096) phase = "Full Moon";
-    else if (moonAge < 20.30228) phase = "Waning Gibbous";
-    else if (moonAge < 23.99361) phase = "Last Quarter";
-    else if (moonAge < 27.68493) phase = "Waning Crescent";
-    else phase = "New Moon";
+    if (moonAge < 1) phase = "New Moon";
+    else if (moonAge < 7.38) phase = "Waxing Crescent";
+    else if (moonAge < 8.38) phase = "First Quarter";
+    else if (moonAge < 14.77) phase = "Waxing Gibbous";
+    else if (moonAge < 15.77) phase = "Full Moon";
+    else if (moonAge < 22.15) phase = "Waning Gibbous";
+    else if (moonAge < 23.15) phase = "Last Quarter";
+    else phase = "Waning Crescent";
+    
+    // Ensure illumination matches phase
+    if (phase === "New Moon") illumination = 0;
+    else if (phase === "Full Moon") illumination = 100;
     
     return [phase, illumination];
 }
-
 function gregorianToHijri(date) {
     const day = date.getDate();
     const month = date.getMonth() + 1;
@@ -199,11 +221,11 @@ function updateUI(data) {
     document.getElementById('gregorian-date').textContent = `Gregorian: ${gregorianDate}`;
     document.getElementById('hijri-date').textContent = `Hijri: ${hijriDate}`;
     
-    const moonPhase = document.getElementById('moon-phase');
-    moonPhase.setAttribute('phase', currentPhase);
-    moonPhase.setAttribute('illumination', illumination);
-    moonPhase.style.setProperty('--_w', `${100 - illumination}%`);
-    document.getElementById('moon-phase-text').innerHTML = `${currentPhase}<br>${illumination}% illuminated`;
+// In the updateUI function, replace the moon phase section with:
+	const moonPhase = document.getElementById('moon-phase');
+	moonPhase.style.setProperty('--illumination', illumination);
+	document.getElementById('moon-phase-text').innerHTML = 
+  `${currentPhase}<br>${illumination}% illuminated`;
     
     document.getElementById('qibla-direction').textContent = `${qiblaDirection}°`;
     document.getElementById('qibla-arrow').style.transform = `rotate(${qiblaDirection}deg)`;
@@ -215,6 +237,7 @@ function updateUI(data) {
     document.querySelector('#isha .time').textContent = prayerTimes['Isha'];
     
     updateNextPrayer();
+	
 }
 
 function updateNextPrayer() {

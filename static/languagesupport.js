@@ -62,6 +62,21 @@ function applyTranslations(lang) {
         }
     });
     
+    // Update prayer names
+    const prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    prayers.forEach(prayer => {
+        const element = document.querySelector(`#${prayer} .prayer-name`);
+        if (element && translations[lang] && translations[lang][prayer]) {
+            element.textContent = translations[lang][prayer];
+        }
+    });
+    
+    // Update countdown label
+    const countdownLabel = document.querySelector('.countdown-label');
+    if (countdownLabel && translations[lang] && translations[lang]['time-until']) {
+        countdownLabel.innerHTML = `${translations[lang]['time-until']}: <span id="next-prayer-name"></span>`;
+    }
+    
     document.documentElement.lang = lang;
     if (lang === 'ar') {
         document.documentElement.dir = 'rtl';
@@ -87,19 +102,20 @@ function initializeLanguage() {
     applyTranslations(currentLanguage);
 }
 
-document.getElementById('language-select').addEventListener('change', function(e) {
-    const selectedLang = e.target.value;
+document.addEventListener('DOMContentLoaded', function() {
+    initializeLanguage();
     
-    if (selectedLang === 'auto') {
-        currentLanguage = detectLanguage();
-        localStorage.removeItem('preferredLanguage');
-    } else {
-        currentLanguage = selectedLang;
-        localStorage.setItem('preferredLanguage', selectedLang);
-    }
-    
-    applyTranslations(currentLanguage);
+    document.getElementById('language-select').addEventListener('change', function(e) {
+        const selectedLang = e.target.value;
+        
+        if (selectedLang === 'auto') {
+            currentLanguage = detectLanguage();
+            localStorage.removeItem('preferredLanguage');
+        } else {
+            currentLanguage = selectedLang;
+            localStorage.setItem('preferredLanguage', selectedLang);
+        }
+        
+        applyTranslations(currentLanguage);
+    });
 });
-
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', initializeLanguage);
