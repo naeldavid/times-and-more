@@ -116,7 +116,7 @@ moon-phase {
 	content: '';
 	position: absolute;
 	inset: 0;
-	background: linear-gradient(145deg, #ccc, #999);
+	background: linear-gradient(145deg, #ccc, #999), url('/static/moon.png');
 	border-radius: 50%;
 	filter: brightness(1.2) contrast(1.1);
   }
@@ -124,7 +124,7 @@ moon-phase {
   moon-phase::after {
 	content: '';
 	position: absolute;
-	background: #000;
+	background: #000, url('/static/moon.png');
 	height: 100%;
 	opacity: 0.85;
   }

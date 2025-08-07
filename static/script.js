@@ -413,4 +413,5 @@ document.addEventListener('DOMContentLoaded', async function() {
     } catch (error) {
         console.error("Initialization error:", error);
     }
+	console.log("App initialized successfully.");
 });
