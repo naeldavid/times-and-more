@@ -430,4 +430,76 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.error("Initialization error:", error);
     }
 	console.log("App initialized successfully.");
+	console.log("DOM loaded, initializing application...");
+	
+	try {
+		// Get location data from IP
+		console.log("Fetching location data from IP address...");
+		const locationData = await getPublicLocation();
+		console.log("Location data obtained:", locationData);
+		
+		// Load data with location information
+		console.log("Loading data for location:", locationData);
+		await fetchData(
+			locationData.city,
+			locationData.country,
+			locationData.latitude,
+			locationData.longitude,
+			locationData.timezone
+		);
+		
+		// Request notification permission
+		console.log("Requesting notification permission");
+		await requestNotificationPermission();
+		
+		// Set up timers
+		console.log("Setting up timers for prayer updates");
+		setInterval(updateNextPrayer, 60000); // Update countdown every minute
+		setInterval(checkPrayerTime, 60000); // Check for prayer times every minute
+		
+		// Setup test button
+		setupTestButton();
+		
+		console.log("Application initialization complete");
+	} catch (error) {
+		console.error("Error during initialization:", error);
+		
+		// Create and display error message in UI
+		const container = document.querySelector('.container');
+		const errorDiv = document.createElement('div');
+		errorDiv.style.backgroundColor = '#ffdddd';
+		errorDiv.style.color = '#d00';
+		errorDiv.style.padding = '10px';
+		errorDiv.style.margin = '10px 0';
+		errorDiv.style.borderRadius = '8px';
+		errorDiv.textContent = `Error initializing application: ${error.message}`;
+		
+		// Insert after header
+		const header = document.querySelector('.header');
+		if (header && container) {
+			container.insertBefore(errorDiv, header.nextSibling);
+		}
+	}
+
+	(async () => {
+		console.log("Initializing prayer times app with geolocation...");
+	
+		const locationData = await getPublicLocation();
+		console.log("Location data:", locationData);
+	
+		await fetchData(
+			locationData.city,
+			locationData.country,
+			locationData.latitude,
+			locationData.longitude,
+			locationData.timezone
+		);
+	
+		await requestNotificationPermission();
+		setInterval(updateNextPrayer, 60000);
+		setInterval(checkPrayerTime, 60000);
+		setupTestButton();
+	
+		console.log("App fully initialized.");
+	})();
 });
