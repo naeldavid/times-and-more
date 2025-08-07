@@ -469,8 +469,53 @@ document.addEventListener('DOMContentLoaded', async function() {
         setInterval(checkPrayerTime, 60000); // Check for prayer times every minute
         
         // Request notification permission
-        console.log("Requesting notification permission");
-        await requestNotificationPermission();
+        // 🔔 Request notification permission on load
+if ('Notification' in window && Notification.permission !== 'granted') {
+    Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+            console.log("✅ Notifications enabled.");
+        } else {
+            console.warn("🚫 Notifications denied.");
+        }
+    });
+}
+
+// 🕒 Function to get time difference in ms
+function getTimeUntil(prayerTime) {
+    const now = new Date();
+    const [hour, minute] = prayerTime.split(':').map(Number);
+    const target = new Date(now);
+    target.setHours(hour, minute, 0, 0);
+    if (target < now) target.setDate(target.getDate() + 1);
+    return target - now;
+}
+
+// 🔔 Send a browser notification
+function sendPrayerNotification(prayerName) {
+    if (Notification.permission === 'granted') {
+        new Notification(`Time for ${prayerName}`, {
+            body: `It's time to pray ${prayerName}.`,
+            icon: "static/favicon.ico"
+        });
+    }
+}
+
+// ⏱️ Schedule a notification
+function schedulePrayerNotification(prayerName, timeStr) {
+    const msUntilPrayer = getTimeUntil(timeStr);
+    console.log(`⏳ ${prayerName} in ${Math.round(msUntilPrayer / 60000)} minutes`);
+    setTimeout(() => {
+        sendPrayerNotification(prayerName);
+    }, msUntilPrayer);
+}
+
+// 🕌 Schedule all prayers
+function scheduleAllPrayerNotifications(prayerTimes) {
+    Object.entries(prayerTimes).forEach(([name, time]) => {
+        schedulePrayerNotification(name, time);
+    });
+}
+
         
         console.log("Application initialization complete");
     } catch (error) {
