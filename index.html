@@ -1,89 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Naël's Times & More</title>
-	<link rel="stylesheet" href="static/style.css">
-	<link rel="icon" type="image/x-icon" href="static/favicon.ico">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naël's Times & More</title>
+    <link rel="stylesheet" href="static/style.css">
+    <link rel="icon" type="image/x-icon" href="static/favicon.ico">
 </head>
 <body>
-	<div class="container">
-		<div class="header">
-			<h1>Times & More</h1>
-		</div>
-		<div class="container">
-			<div class="header">
-				<h1 data-translate="title">Prayer Times & More</h1>
-			</div>
-			
-			<div class="language-selector">
-				<select id="language-select">
-					<option value="auto" data-translate="auto-detect">Auto-detect</option>
-					<option value="en">English</option>
-					<option value="ar">العربية</option>
-					<option value="fr">Français</option>
-				</select>
-			</div>
-		<div class="info-row">
-			<div class="location">
-				<span id="location-display">Loading...</span>
-				<span id="timezone-display">--</span>
-			</div>
-			
-			<div class="qibla-container">
-				<div class="compass">
-					<div class="north-indicator"></div>
-					<div id="qibla-arrow" class="qibla-arrow"></div>
-					<span class="compass-label north">N</span>
-				</div>
-				<small>Qibla Direction from North: <span id="qibla-direction">--</span></small>
-			</div>
-			
-			<div class="moon-container">
-				<moon-phase id="moon-phase"></moon-phase>
-				<div class="moon-info">
-					<small id="moon-phase-text">Loading...</small>
-				</div>
-			</div>
-		</div>
-		
-		<div class="dates">
-			<div id="gregorian-date">Loading Gregorian date...</div>
-			<div id="hijri-date">Loading Hijri date...</div>
-		</div>
-		
-		<div class="prayer-times">
-			<div class="prayer" id="fajr">
-				<div class="prayer-name">Fajr</div>
-				<div class="time">--:--</div>
-			</div>
-			<div class="prayer" id="dhuhr">
-				<div class="prayer-name">Dhuhr</div>
-				<div class="time">--:--</div>
-			</div>
-			<div class="prayer" id="asr">
-				<div class="prayer-name">Asr</div>
-				<div class="time">--:--</div>
-			</div>
-			<div class="prayer" id="maghrib">
-				<div class="prayer-name">Maghrib</div>
-				<div class="time">--:--</div>
-			</div>
-			<div class="prayer" id="isha">
-				<div class="prayer-name">Isha</div>
-				<div class="time">--:--</div>
-			</div>
-		</div>
-		
-		<div class="countdown-container">
-			<div class="countdown-label">
-				Time until next prayer: <span id="next-prayer-name"></span>
-			</div>
-			 <div id="countdown-timer"></div> hours : minutes
-		</div>
-	</div>
+    <div class="container">
+        <div class="header">
+            <h1>Times & More</h1>
+        </div>
+        <button id="notify-btn" style="display:none">Test Notifications</button>
+        <div class="language-selector">
+            <select id="language-select">
+                <option value="auto" data-translate="auto-detect">Auto-detect</option>
+                <option value="en">English</option>
+                <option value="ar">العربية</option>
+                <option value="fr">Français</option>
+            </select>
+        </div>
+        
+        <div class="info-row">
+            <div class="location">
+                <span id="location-display">Loading...</span>
+                <span id="timezone-display">--</span>
+            </div>
+            
+            <div class="qibla-container">
+                <div class="compass">
+                    <div class="north-indicator"></div>
+                    <div id="qibla-arrow" class="qibla-arrow"></div>
+                    <span class="compass-label north">N</span>
+                </div>
+                <small>Qibla Direction from North: <span id="qibla-direction">--</span></small>
+            </div>
+            
+            <div class="moon-container">
+                <moon-phase id="moon-phase"></moon-phase>
+                <div class="moon-info">
+                    <small id="moon-phase-text">Loading...</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="dates">
+            <div id="gregorian-date">Loading Gregorian date...</div>
+            <div id="hijri-date">Loading Hijri date...</div>
+        </div>
+        
+        <div class="prayer-times">
+            <div class="prayer" id="fajr">
+                <div class="prayer-name">Fajr</div>
+                <div class="time">--:--</div>
+            </div>
+            <div class="prayer" id="dhuhr">
+                <div class="prayer-name">Dhuhr</div>
+                <div class="time">--:--</div>
+            </div>
+            <div class="prayer" id="asr">
+                <div class="prayer-name">Asr</div>
+                <div class="time">--:--</div>
+            </div>
+            <div class="prayer" id="maghrib">
+                <div class="prayer-name">Maghrib</div>
+                <div class="time">--:--</div>
+            </div>
+            <div class="prayer" id="isha">
+                <div class="prayer-name">Isha</div>
+                <div class="time">--:--</div>
+            </div>
+        </div>
+        
+        <div class="countdown-container">
+            <div class="countdown-label">
+                Time until next prayer: <span id="next-prayer-name"></span>
+            </div>
+            <div id="countdown-timer"></div>
+        </div>
+    </div>
 
-	<script src="static/script.js"></script>
+    <script src="static/languagesupport.js"></script>
+    <script src="static/script.js"></script>
 </body>
 </html>

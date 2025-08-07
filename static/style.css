@@ -44,6 +44,25 @@ body {
 	letter-spacing: 0.5px;
 }
 
+.language-selector {
+	text-align: center;
+	margin-bottom: 20px;
+}
+
+.language-selector select {
+	background: rgba(255, 255, 255, 0.2);
+	color: white;
+	border: none;
+	padding: 10px;
+	border-radius: 10px;
+	font-size: 1em;
+}
+
+.language-selector select option {
+	background: #333;
+	color: white;
+}
+
 .header::after {
 	content: '';
 	display: block;
