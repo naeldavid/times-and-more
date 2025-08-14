@@ -13,7 +13,18 @@ const translations = {
         'asr': 'Asr',
         'maghrib': 'Maghrib',
         'isha': 'Isha',
-        'time-until': 'Time until next prayer'
+        'time-until': 'Time until next prayer',
+        'gregorian': 'Gregorian',
+        'hijri': 'Hijri',
+        'illuminated': 'illuminated',
+        'new-moon': 'New Moon',
+        'waxing-crescent': 'Waxing Crescent',
+        'first-quarter': 'First Quarter',
+        'waxing-gibbous': 'Waxing Gibbous',
+        'full-moon': 'Full Moon',
+        'waning-gibbous': 'Waning Gibbous',
+        'last-quarter': 'Last Quarter',
+        'waning-crescent': 'Waning Crescent'
     },
     ar: {
         'title': 'مواقيت الصلاة والمزيد',
@@ -27,7 +38,18 @@ const translations = {
         'asr': 'العصر',
         'maghrib': 'المغرب',
         'isha': 'العشاء',
-        'time-until': 'الوقت المتبقي للصلاة التالية'
+        'time-until': 'الوقت المتبقي للصلاة التالية',
+        'gregorian': 'ميلادي',
+        'hijri': 'هجري',
+        'illuminated': 'مضاء',
+        'new-moon': 'محاق',
+        'waxing-crescent': 'هلال متزايد',
+        'first-quarter': 'تربيع أول',
+        'waxing-gibbous': 'أحدب متزايد',
+        'full-moon': 'بدر',
+        'waning-gibbous': 'أحدب متناقص',
+        'last-quarter': 'تربيع أخير',
+        'waning-crescent': 'هلال متناقص'
     },
     fr: {
         'title': 'Heures de Prière et Plus',
@@ -41,7 +63,18 @@ const translations = {
         'asr': 'Asr',
         'maghrib': 'Maghrib',
         'isha': 'Isha',
-        'time-until': 'Temps jusqu\'à la prochaine prière'
+        'time-until': 'Temps jusqu\'à la prochaine prière',
+        'gregorian': 'Grégorien',
+        'hijri': 'Hijri',
+        'illuminated': 'illuminé',
+        'new-moon': 'Nouvelle Lune',
+        'waxing-crescent': 'Premier Croissant',
+        'first-quarter': 'Premier Quartier',
+        'waxing-gibbous': 'Lune Gibbeuse Croissante',
+        'full-moon': 'Pleine Lune',
+        'waning-gibbous': 'Lune Gibbeuse Décroissante',
+        'last-quarter': 'Dernier Quartier',
+        'waning-crescent': 'Dernier Croissant'
     }
 };
 
@@ -87,6 +120,15 @@ function applyTranslations(lang) {
     }
 }
 
+function getTranslation(key) {
+    return translations[currentLanguage] && translations[currentLanguage][key] ? translations[currentLanguage][key] : key;
+}
+
+function translateMoonPhase(phase) {
+    const phaseKey = phase.toLowerCase().replace(/\s+/g, '-');
+    return getTranslation(phaseKey);
+}
+
 function initializeLanguage() {
     const savedLang = localStorage.getItem('preferredLanguage');
     const languageSelect = document.getElementById('language-select');
@@ -117,5 +159,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         applyTranslations(currentLanguage);
+        
+        // Re-translate dynamic content if it exists
+        if (window.updateDynamicTranslations) {
+            window.updateDynamicTranslations();
+        }
     });
 });
+
+window.getTranslation = getTranslation;
+window.translateMoonPhase = translateMoonPhase;
+window.getCurrentLanguage = () => currentLanguage;

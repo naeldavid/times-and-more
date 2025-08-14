@@ -226,22 +226,8 @@ function updateUI(data) {
     
     document.getElementById('location-display').textContent = `${city}, ${country}`;
     document.getElementById('timezone-display').textContent = getGMTOffset(timezone, data.latitude, data.longitude);
-    document.getElementById('gregorian-date').textContent = `Gregorian: ${gregorianDate}`;
-    document.getElementById('hijri-date').textContent = `Hijri: ${hijriDate}`;
     
-	// Update moon phase
-	const moonPhase = document.getElementById('moon-phase');
-	const moonPhaseText = document.getElementById('moon-phase-text');
-	
-	if (moonPhase && moonPhaseText) {
-		moonPhase.setAttribute('phase', currentPhase);
-		moonPhase.style.setProperty('--illumination', `${illumination}%`);
-		moonPhaseText.innerHTML = `${currentPhase}<br>${illumination}% illuminated`;
-		console.log('Moon phase CSS variable set:', `--illumination: ${illumination}%`);
-		console.log("Updated moon phase:", currentPhase, illumination);
-	} else {
-		console.error('Moon phase elements not found');
-	}
+    updateDynamicTranslations(gregorianDate, hijriDate, currentPhase, illumination);
     
     document.getElementById('qibla-direction').textContent = `${qiblaDirection}°`;
     document.getElementById('qibla-arrow').style.transform = `rotate(${qiblaDirection}deg)`;
@@ -253,8 +239,58 @@ function updateUI(data) {
     document.querySelector('#isha .time').textContent = prayerTimes['Isha'];
     
     updateNextPrayer();
-	
 }
+
+function updateDynamicTranslations(gregorianDate, hijriDate, currentPhase, illumination) {
+    const getTranslation = window.getTranslation || ((key) => key);
+    const translateMoonPhase = window.translateMoonPhase || ((phase) => phase);
+    
+    if (gregorianDate) {
+        document.getElementById('gregorian-date').textContent = `${getTranslation('gregorian')}: ${gregorianDate}`;
+    }
+    if (hijriDate) {
+        document.getElementById('hijri-date').textContent = `${getTranslation('hijri')}: ${hijriDate}`;
+    }
+    
+    if (currentPhase && illumination !== undefined) {
+        const moonPhase = document.getElementById('moon-phase');
+        const moonPhaseText = document.getElementById('moon-phase-text');
+        
+        if (moonPhase && moonPhaseText) {
+            moonPhase.setAttribute('phase', currentPhase);
+            moonPhase.style.setProperty('--illumination', `${illumination}%`);
+            const translatedPhase = translateMoonPhase(currentPhase);
+            const translatedIlluminated = getTranslation('illuminated');
+            moonPhaseText.innerHTML = `${translatedPhase}<br>${illumination}% ${translatedIlluminated}`;
+        }
+    }
+}
+
+window.updateDynamicTranslations = () => {
+    const gregorianEl = document.getElementById('gregorian-date');
+    const hijriEl = document.getElementById('hijri-date');
+    const moonPhaseTextEl = document.getElementById('moon-phase-text');
+    
+    if (gregorianEl && gregorianEl.textContent.includes(':')) {
+        const date = gregorianEl.textContent.split(': ')[1];
+        updateDynamicTranslations(date, null, null, null);
+    }
+    
+    if (hijriEl && hijriEl.textContent.includes(':')) {
+        const date = hijriEl.textContent.split(': ')[1];
+        updateDynamicTranslations(null, date, null, null);
+    }
+    
+    if (moonPhaseTextEl && moonPhaseTextEl.innerHTML.includes('<br>')) {
+        const parts = moonPhaseTextEl.innerHTML.split('<br>');
+        const phase = parts[0];
+        const illuminationMatch = parts[1].match(/(\d+)%/);
+        if (illuminationMatch) {
+            const illumination = parseInt(illuminationMatch[1]);
+            updateDynamicTranslations(null, null, phase, illumination);
+        }
+    }
+};
 
 function updateNextPrayer() {
     const now = new Date();
@@ -288,7 +324,9 @@ function updateNextPrayer() {
     
     if (nextPrayer) {
         prayerElements[nextPrayer].classList.add('next');
-        document.getElementById('next-prayer-name').textContent = nextPrayer;
+        const getTranslation = window.getTranslation || ((key) => key);
+        const translatedPrayerName = getTranslation(nextPrayer.toLowerCase());
+        document.getElementById('next-prayer-name').textContent = translatedPrayerName;
         
         const hours = Math.floor(minDiff / (1000 * 60 * 60));
         const minutes = Math.floor((minDiff % (1000 * 60 * 60)) / (1000 * 60));
