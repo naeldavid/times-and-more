@@ -1,11 +1,13 @@
 :root {
 	--primary: #000;
 	--secondary: #000;
-	--accent: #000;
+	--accent: #4CAF50;
 	--dark: #000;
 	--darker: #000;
 	--light: #fff;
 	--card-bg: #fff;
+	--green: #4CAF50;
+	--green-dark: #388E3C;
 }
 
 body {
@@ -68,7 +70,7 @@ body {
 	display: block;
 	width: 100px;
 	height: 3px;
-	background: var(--light);
+	background: var(--green);
 	margin: 15px auto 0;
 	border-radius: 3px;
 }
@@ -177,10 +179,10 @@ moon-phase::after {
 }
 
 .prayer.next {
-	background-color: #fff;
-	color: #000000;
+	background-color: var(--green);
+	color: #fff;
 	transform: scale(1.05);
-	box-shadow: none;
+	box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
 	position: relative;
 	z-index: 1;
 }
@@ -190,8 +192,8 @@ moon-phase::after {
 	position: absolute;
 	top: -10px;
 	right: -10px;
-	background: var(--light);
-	color: var(--dark);
+	background: var(--green-dark);
+	color: #fff;
 	font-size: 0.7rem;
 	font-weight: bold;
 	padding: 3px 8px;
@@ -222,14 +224,14 @@ moon-phase::after {
 .countdown-label {
 	font-size: 1.2rem;
 	margin-bottom: 10px;
-	color: #ff5e00;
+	color: var(--green-dark);
 	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .countdown-label span,
 #next-prayer-name {
 	font-weight: 600;
-	color: #ff5e00;
+	color: var(--green-dark);
 	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -261,7 +263,7 @@ moon-phase::after {
 	left: 50%;
 	width: 2px;
 	height: 20px;
-	background: linear-gradient(to bottom, #4CAF50 50%, #4CAF50 50%);
+	background: linear-gradient(to bottom, var(--green) 50%, var(--green-dark) 50%);
 	transform-origin: center bottom;
 	margin-left: -1px;
 	margin-top: -20px;

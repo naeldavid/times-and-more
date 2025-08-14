@@ -167,6 +167,69 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+window.updateDynamicTranslations = () => {
+    // Update dates
+    const gregorianEl = document.getElementById('gregorian-date');
+    const hijriEl = document.getElementById('hijri-date');
+    
+    if (gregorianEl && gregorianEl.textContent.includes(':')) {
+        const date = gregorianEl.textContent.split(': ')[1];
+        gregorianEl.textContent = `${getTranslation('gregorian')}: ${date}`;
+    }
+    
+    if (hijriEl && hijriEl.textContent.includes(':')) {
+        const date = hijriEl.textContent.split(': ')[1];
+        hijriEl.textContent = `${getTranslation('hijri')}: ${date}`;
+    }
+    
+    // Update moon phase
+    const moonPhaseTextEl = document.getElementById('moon-phase-text');
+    if (moonPhaseTextEl && moonPhaseTextEl.innerHTML.includes('<br>')) {
+        const parts = moonPhaseTextEl.innerHTML.split('<br>');
+        const illuminationMatch = parts[1].match(/(\d+)%/);
+        if (illuminationMatch) {
+            const illumination = parseInt(illuminationMatch[1]);
+            let originalPhase = parts[0];
+            
+            // Find original English phase name by checking all languages
+            const phaseKeys = ['new-moon', 'waxing-crescent', 'first-quarter', 'waxing-gibbous', 'full-moon', 'waning-gibbous', 'last-quarter', 'waning-crescent'];
+            let englishPhase = originalPhase;
+            
+            // Check if current phase matches any translation
+            for (const key of phaseKeys) {
+                if (translations.en[key] === originalPhase || 
+                    translations.ar[key] === originalPhase || 
+                    translations.fr[key] === originalPhase) {
+                    englishPhase = translations.en[key];
+                    break;
+                }
+            }
+            
+            const translatedPhase = translateMoonPhase(englishPhase);
+            const translatedIlluminated = getTranslation('illuminated');
+            moonPhaseTextEl.innerHTML = `${translatedPhase}<br>${illumination}% ${translatedIlluminated}`;
+        }
+    }
+    
+    // Update qibla direction text
+    const qiblaText = document.querySelector('.qibla-container small');
+    if (qiblaText) {
+        const directionSpan = qiblaText.querySelector('#qibla-direction');
+        if (directionSpan) {
+            const direction = directionSpan.textContent;
+            qiblaText.innerHTML = `${getTranslation('qibla-direction')}: <span id="qibla-direction">${direction}</span>`;
+        }
+    }
+    
+    // Update next prayer name in countdown
+    const nextPrayerEl = document.getElementById('next-prayer-name');
+    if (nextPrayerEl && nextPrayerEl.textContent) {
+        const prayerName = nextPrayerEl.textContent.toLowerCase();
+        const translatedName = getTranslation(prayerName);
+        nextPrayerEl.textContent = translatedName;
+    }
+};
+
 window.getTranslation = getTranslation;
 window.translateMoonPhase = translateMoonPhase;
 window.getCurrentLanguage = () => currentLanguage;
