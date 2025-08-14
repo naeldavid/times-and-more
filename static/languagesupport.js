@@ -2,9 +2,10 @@
 
 const translations = {
     en: {
-        'title': 'Prayer Times & More',
+        'title': 'Times & More',
         'auto-detect': 'Auto-detect',
         'loading': 'Loading...',
+        'test-notification': 'Test Notifications',
         'qibla-direction': 'Qibla Direction from North',
         'loading-gregorian': 'Loading Gregorian date...',
         'loading-hijri': 'Loading Hijri date...',
@@ -16,9 +17,10 @@ const translations = {
         'time-until': 'Time until next prayer'
     },
     ar: {
-        'title': 'مواقيت الصلاة والمزيد',
+        'title': 'الأوقات والمزيد',
         'auto-detect': 'كشف تلقائي',
         'loading': 'جاري التحميل...',
+        'test-notification': 'اختبار الإشعارات',
         'qibla-direction': 'اتجاه القبلة من الشمال',
         'loading-gregorian': 'جاري تحميل التاريخ الميلادي...',
         'loading-hijri': 'جاري تحميل التاريخ الهجري...',
@@ -30,9 +32,10 @@ const translations = {
         'time-until': 'الوقت المتبقي للصلاة التالية'
     },
     fr: {
-        'title': 'Heures de Prière et Plus',
+        'title': 'Temps et Plus',
         'auto-detect': 'Détection automatique',
         'loading': 'Chargement...',
+        'test-notification': 'Tester les Notifications',
         'qibla-direction': 'Direction de la Qibla depuis le Nord',
         'loading-gregorian': 'Chargement de la date grégorienne...',
         'loading-hijri': 'Chargement de la date hijri...',
