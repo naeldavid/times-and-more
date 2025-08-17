@@ -16,7 +16,7 @@ All in a clean, responsive, and minimal design.
 - 📍 **Geolocation support** – automatically detects user’s location and timezone.
 - 🕌 **Prayer times** – shows Fajr, Dhuhr, Asr, Maghrib, and Isha times.
 - ⏳ **Countdown timer** – live countdown to the next prayer.
-- 🧭 **Qibla direction** – compass with real-time Qibla arrow.
+- 🧭 **Qibla direction** – compass with Qibla arrow, angle from north.
 - 🌙 **Moon phase** – dynamic moon visualization with textual description.
 - 📅 **Calendar dates** – displays both Gregorian and Hijri dates.
 - 🌐 **Languages** – supports English, Arabic, French, with auto-detect option.
