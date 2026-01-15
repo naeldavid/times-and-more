@@ -3,85 +3,212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Islamic prayer times, Qibla direction, moon phase, and Hijri calendar">
+    <meta name="theme-color" content="#4CAF50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.aladhan.com https://nominatim.openstreetmap.org;">
+    <link rel="manifest" href="/manifest.json">
     <title>Naël's Times & More</title>
     <link rel="stylesheet" href="static/style.css">
     <link rel="icon" type="image/x-icon" href="static/favicon.ico">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
+    <div id="loading-overlay" class="loading-overlay" hidden>
+        <div class="spinner" role="status" aria-label="Loading"></div>
+    </div>
+    
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+    <main class="container" role="main" id="main-content">
+        <header class="header">
             <h1>Times & More</h1>
-        </div>
-        <button id="notify-btn" style="display:none">Test Notifications</button>
-        <div class="language-selector">
-            <select id="language-select">
-                <option value="auto" data-translate="auto-detect">Auto-detect</option>
-                <option value="en">English</option>
-                <option value="ar">العربية</option>
-                <option value="fr">Français</option>
-            </select>
+            <button id="refresh-btn" class="refresh-btn" aria-label="Refresh prayer times" title="Refresh prayer times">
+                🔄
+            </button>
+        </header>
+        
+        <div id="status-indicator" class="status-indicator" hidden>
+            <span class="status-dot"></span>
+            <span id="status-text">Loading...</span>
+            <span id="last-updated" class="last-updated" aria-label="Last updated"></span>
         </div>
         
-        <div class="info-row">
-            <div class="location">
-                <span id="location-display">Loading...</span>
-                <span id="timezone-display">--</span>
+        <button id="settings-toggle" class="settings-toggle" aria-label="Toggle settings" aria-expanded="false">
+            ⚙️ Settings
+        </button>
+        
+        <div id="settings-panel" class="settings-panel" hidden aria-label="Application settings">
+            <h3>Notification Settings</h3>
+            <div class="setting-item">
+                <label for="enable-notifications">
+                    <input type="checkbox" id="enable-notifications" aria-describedby="notifications-desc">
+                    Enable Prayer Notifications
+                </label>
+                <small id="notifications-desc">Receive notifications at prayer times</small>
+            </div>
+
+            <div class="setting-item">
+                <label for="advance-notif">
+                    Advance notification
+                </label>
+                <select id="advance-notif" aria-label="Advance notification minutes">
+                    <option value="0">At prayer time</option>
+                    <option value="5">5 minutes before</option>
+                    <option value="10">10 minutes before</option>
+                    <option value="15">15 minutes before</option>
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <label for="notification-sound">
+                    <input type="checkbox" id="notification-sound" aria-describedby="sound-desc">
+                    Play Notification Sound
+                </label>
+                <small id="sound-desc">Play a sound with notifications</small>
+            </div>
+
+            <div class="setting-item">
+                <label for="asr-school">Asr method</label>
+                <select id="asr-school" aria-label="Asr juristic method">
+                    <option value="0">Standard (Shafi/Maliki/Hanbali)</option>
+                    <option value="1">Hanafi</option>
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <label for="time-adjust">Prayer time adjustment</label>
+                <select id="time-adjust" aria-label="Prayer time adjustment minutes">
+                    <option value="0">0 min</option>
+                    <option value="-2">-2 min</option>
+                    <option value="-1">-1 min</option>
+                    <option value="1">+1 min</option>
+                    <option value="2">+2 min</option>
+                </select>
+                <small>Applies to all prayers (local adjustment)</small>
+            </div>
+
+            <div class="setting-item">
+                <label for="high-contrast">
+                    <input type="checkbox" id="high-contrast">
+                    High contrast
+                </label>
+            </div>
+
+            <div class="setting-item settings-actions">
+                <button id="test-notification-btn" class="btn-secondary">Test Notification</button>
+                <button id="share-btn" class="btn-secondary">Share</button>
+                <button id="export-ics-btn" class="btn-secondary">Export iCal</button>
+                <button id="install-btn" class="btn-secondary" hidden>Install App</button>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="language-selector" role="region" aria-label="Language selection">
+                <label for="language-select" class="visually-hidden">Select language</label>
+                <select id="language-select" aria-label="Choose your preferred language">
+                    <option value="auto" data-translate="auto-detect">Auto-detect</option>
+                    <option value="en">English</option>
+                    <option value="ar">العربية</option>
+                    <option value="fr">Français</option>
+                </select>
             </div>
             
-            <div class="qibla-container">
-                <div class="compass">
-                    <div class="north-indicator"></div>
-                    <div id="qibla-arrow" class="qibla-arrow"></div>
-                    <span class="compass-label north">N</span>
+            <div class="calculation-selector" role="region" aria-label="Prayer calculation method">
+                <label for="calculation-select" class="visually-hidden">Select prayer calculation method</label>
+                <select id="calculation-select" aria-label="Choose prayer calculation method">
+                    <option value="auto">Auto (by location)</option>
+                    <option value="2">ISNA (North America)</option>
+                    <option value="3">MWL (Europe, Far East)</option>
+                    <option value="4">Umm al-Qura (Saudi Arabia)</option>
+                    <option value="5">Egyptian General Authority</option>
+                    <option value="1">University of Islamic Sciences, Karachi</option>
+                    <option value="7">Institute of Geophysics, Tehran</option>
+                    <option value="12">Union of Islamic Organizations of France</option>
+                    <option value="15">Kuwait</option>
+                    <option value="16">Qatar</option>
+                </select>
+            </div>
+            
+            <div class="theme-selector" role="region" aria-label="Theme selection">
+                <label for="theme-select" class="visually-hidden">Select theme</label>
+                <select id="theme-select" aria-label="Choose color theme">
+                    <option value="auto">🌓 Auto</option>
+                    <option value="light">☀️ Light</option>
+                    <option value="dark">🌙 Dark</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="info-row" role="region" aria-label="Location, Qibla, and Moon Phase information">
+            <div class="location" role="status" aria-live="polite">
+                <span id="location-display" aria-label="Current location">Loading...</span>
+                <span id="timezone-display" aria-label="Timezone">--</span>
+            </div>
+            
+            <div class="qibla-container" role="region" aria-label="Qibla direction compass">
+                <div class="compass" role="img" aria-label="Compass showing Qibla direction">
+                    <div class="north-indicator" aria-hidden="true"></div>
+                    <div id="qibla-arrow" class="qibla-arrow" aria-hidden="true"></div>
+                    <span class="compass-label north" aria-label="North direction">N</span>
                 </div>
-                <small>Qibla Direction from North: <span id="qibla-direction">--</span></small>
+                <small>Qibla Direction from North: <span id="qibla-direction" aria-live="polite">--</span></small>
             </div>
             
-            <div class="moon-container">
-                <moon-phase id="moon-phase"></moon-phase>
+            <div class="moon-container" role="region" aria-label="Current moon phase">
+                <moon-phase id="moon-phase" role="img" aria-label="Moon phase visualization"></moon-phase>
                 <div class="moon-info">
-                    <small id="moon-phase-text">Loading...</small>
+                    <small id="moon-phase-text" aria-live="polite">Loading...</small>
                 </div>
             </div>
         </div>
         
-        <div class="dates">
-            <div id="gregorian-date">Loading Gregorian date...</div>
-            <div id="hijri-date">Loading Hijri date...</div>
-        </div>
+        <section class="dates" role="region" aria-label="Current dates">
+            <div id="gregorian-date" aria-label="Gregorian calendar date">Loading Gregorian date...</div>
+            <div id="hijri-date" aria-label="Hijri calendar date">Loading Hijri date...</div>
+        </section>
         
-        <div class="prayer-times">
-            <div class="prayer" id="fajr">
-                <div class="prayer-name">Fajr</div>
-                <div class="time">--:--</div>
-            </div>
-            <div class="prayer" id="dhuhr">
-                <div class="prayer-name">Dhuhr</div>
-                <div class="time">--:--</div>
-            </div>
-            <div class="prayer" id="asr">
-                <div class="prayer-name">Asr</div>
-                <div class="time">--:--</div>
-            </div>
-            <div class="prayer" id="maghrib">
-                <div class="prayer-name">Maghrib</div>
-                <div class="time">--:--</div>
-            </div>
-            <div class="prayer" id="isha">
-                <div class="prayer-name">Isha</div>
-                <div class="time">--:--</div>
-            </div>
-        </div>
+        <section class="prayer-times" role="region" aria-label="Islamic prayer times">
+            <article class="prayer" id="fajr" role="article" aria-labelledby="fajr-name">
+                <div class="prayer-name" id="fajr-name">Fajr</div>
+                <div class="time" aria-label="Fajr prayer time">--:--</div>
+            </article>
+            <article class="prayer" id="dhuhr" role="article" aria-labelledby="dhuhr-name">
+                <div class="prayer-name" id="dhuhr-name">Dhuhr</div>
+                <div class="time" aria-label="Dhuhr prayer time">--:--</div>
+            </article>
+            <article class="prayer" id="asr" role="article" aria-labelledby="asr-name">
+                <div class="prayer-name" id="asr-name">Asr</div>
+                <div class="time" aria-label="Asr prayer time">--:--</div>
+            </article>
+            <article class="prayer" id="maghrib" role="article" aria-labelledby="maghrib-name">
+                <div class="prayer-name" id="maghrib-name">Maghrib</div>
+                <div class="time" aria-label="Maghrib prayer time">--:--</div>
+            </article>
+            <article class="prayer" id="isha" role="article" aria-labelledby="isha-name">
+                <div class="prayer-name" id="isha-name">Isha</div>
+                <div class="time" aria-label="Isha prayer time">--:--</div>
+            </article>
+        </section>
         
-        <div class="countdown-container">
+        <aside class="countdown-container" role="complementary" aria-label="Countdown to next prayer" aria-live="polite">
             <div class="countdown-label">
                 Time until next prayer: <span id="next-prayer-name"></span>
             </div>
-            <div id="countdown-timer"></div>
-        </div>
-    </div>
+            <div id="countdown-timer" aria-label="Time remaining"></div>
+        </aside>
+    </main>
 
     <script src="static/languagesupport.js"></script>
     <script src="static/script.js"></script>
+    <script>
+        // Register Service Worker for offline support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .catch(() => {
+                        // Service worker registration failed - continue without offline support
+                    });
+            });
+        }
+    </script>
 </body>
 </html>

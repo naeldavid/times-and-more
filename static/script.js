@@ -1,10 +1,5 @@
 "use strict";
 
-const now = new Date();
-const today = now.getFullYear().toString() +
-    (now.getMonth() + 1).toString().padStart(2, '0') +
-    now.getDate().toString().padStart(2, '0');
-
 // Default location fallback
 const defaultLocation = {
     city: 'Manama',
@@ -14,7 +9,217 @@ const defaultLocation = {
     timezone: 'Asia/Bahrain'
 };
 
+// Calculation method mapping by region
+const calculationMethodsByRegion = {
+    'North America': '2',  // ISNA
+    'Europe': '3',         // MWL
+    'Middle East': '4',    // Umm al-Qura
+    'Asia': '1',           // Karachi
+    'Africa': '5'          // Egyptian
+};
+
 let notificationPermissionGranted = false;
+let currentCalculationMethod = 'auto';
+let currentTheme = 'auto';
+let notificationsEnabled = false;
+let notificationSoundEnabled = false;
+let advanceNotificationMinutes = 0;
+let asrSchool = '0';
+let timeAdjustmentMinutes = 0;
+let highContrastEnabled = false;
+let isLoading = false;
+let lastUpdated = null;
+
+// Simple client-side error log (kept small)
+const errorLog = [];
+
+function logError(message, context = {}) {
+    try {
+        const entry = {
+            at: new Date().toISOString(),
+            message: String(message),
+            context
+        };
+        errorLog.unshift(entry);
+        errorLog.splice(20);
+        localStorage.setItem('errorLog', JSON.stringify(errorLog));
+    } catch (_) {
+        // ignore
+    }
+}
+
+// DOM element cache
+const DOMCache = {};
+
+/**
+ * Initialize and cache DOM elements
+ */
+function initDOMCache() {
+    DOMCache.loadingOverlay = document.getElementById('loading-overlay');
+    DOMCache.locationDisplay = document.getElementById('location-display');
+    DOMCache.timezoneDisplay = document.getElementById('timezone-display');
+    DOMCache.gregorianDate = document.getElementById('gregorian-date');
+    DOMCache.hijriDate = document.getElementById('hijri-date');
+    DOMCache.moonPhase = document.getElementById('moon-phase');
+    DOMCache.moonPhaseText = document.getElementById('moon-phase-text');
+    DOMCache.qiblaDirection = document.getElementById('qibla-direction');
+    DOMCache.qiblaArrow = document.getElementById('qibla-arrow');
+    DOMCache.nextPrayerName = document.getElementById('next-prayer-name');
+    DOMCache.countdownTimer = document.getElementById('countdown-timer');
+    DOMCache.refreshBtn = document.getElementById('refresh-btn');
+    DOMCache.statusIndicator = document.getElementById('status-indicator');
+    DOMCache.statusText = document.getElementById('status-text');
+    DOMCache.lastUpdatedEl = document.getElementById('last-updated');
+    DOMCache.prayerElements = {
+        fajr: document.getElementById('fajr'),
+        dhuhr: document.getElementById('dhuhr'),
+        asr: document.getElementById('asr'),
+        maghrib: document.getElementById('maghrib'),
+        isha: document.getElementById('isha')
+    };
+}
+
+/**
+ * Update status indicator
+ * @param {string} message - Status message
+ * @param {boolean} isOffline - Whether app is offline
+ */
+function formatLastUpdated(date) {
+    if (!date) return '';
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin === 1) return '1 min ago';
+    if (diffMin < 60) return `${diffMin} min ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr === 1) return '1 hour ago';
+    return `${diffHr} hours ago`;
+}
+
+function updateStatusIndicator(message, isOffline = false) {
+    if (DOMCache.statusIndicator && DOMCache.statusText) {
+        DOMCache.statusText.textContent = message;
+        if (DOMCache.lastUpdatedEl) {
+            DOMCache.lastUpdatedEl.textContent = lastUpdated ? formatLastUpdated(lastUpdated) : '';
+        }
+        if (isOffline) {
+            DOMCache.statusIndicator.classList.add('offline');
+        } else {
+            DOMCache.statusIndicator.classList.remove('offline');
+        }
+        DOMCache.statusIndicator.removeAttribute('hidden');
+        
+        // Auto-hide after 4 seconds
+        setTimeout(() => {
+            if (DOMCache.statusIndicator) {
+                DOMCache.statusIndicator.setAttribute('hidden', '');
+            }
+        }, 4000);
+    }
+}
+
+/**
+ * Setup refresh button
+ */
+function setupRefreshButton() {
+    if (DOMCache.refreshBtn) {
+        DOMCache.refreshBtn.addEventListener('click', async () => {
+            if (isLoading || !locationData) return;
+            
+            DOMCache.refreshBtn.classList.add('spinning');
+            updateStatusIndicator('Refreshing...');
+            
+            await fetchData(
+                locationData.city,
+                locationData.country,
+                locationData.latitude,
+                locationData.longitude,
+                locationData.timezone,
+                true
+            );
+            
+            DOMCache.refreshBtn.classList.remove('spinning');
+            updateStatusIndicator('Updated successfully');
+        });
+    }
+}
+
+/**
+ * Show loading overlay
+ */
+function setPrayerSkeletonLoading(isActive) {
+    if (!DOMCache.prayerElements) return;
+    Object.values(DOMCache.prayerElements).forEach((el) => {
+        if (!el) return;
+        if (isActive) {
+            el.classList.add('loading');
+        } else {
+            el.classList.remove('loading');
+        }
+    });
+}
+
+function showLoading() {
+    if (DOMCache.loadingOverlay) {
+        DOMCache.loadingOverlay.removeAttribute('hidden');
+    }
+    setPrayerSkeletonLoading(true);
+    isLoading = true;
+}
+
+/**
+ * Hide loading overlay
+ */
+function hideLoading() {
+    if (DOMCache.loadingOverlay) {
+        DOMCache.loadingOverlay.setAttribute('hidden', '');
+    }
+    setPrayerSkeletonLoading(false);
+    isLoading = false;
+}
+
+function applyTheme(theme) {
+    if (theme === 'auto') {
+        // Check system preference
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+    } else {
+        document.documentElement.setAttribute('data-theme', theme);
+    }
+    
+    // Update meta theme-color
+    const themeColor = theme === 'light' || (theme === 'auto' && !window.matchMedia('(prefers-color-scheme: dark)').matches) 
+        ? '#f5f5f5' 
+        : '#000000';
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', themeColor);
+}
+
+function showNotification(message, type = 'info') {
+    const existingNotification = document.querySelector('.user-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `user-notification ${type}`;
+    notification.setAttribute('role', 'alert');
+    notification.setAttribute('aria-live', 'polite');
+    notification.textContent = message;
+    
+    const header = document.querySelector('.header');
+    if (header) {
+        header.parentNode.insertBefore(notification, header.nextSibling);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }
+        }, 5000);
+    }
+}
 
 async function getPublicLocation() {
     return new Promise((resolve) => {
@@ -33,7 +238,7 @@ async function getPublicLocation() {
                         city = data.address.city || data.address.town || data.address.village || defaultLocation.city;
                         country = data.address.country || defaultLocation.country;
                     } catch (e) {
-                        console.warn("Reverse geocoding failed:", e);
+                        // Silently fail for geocoding - not critical
                     }
 
                     resolve({
@@ -45,51 +250,140 @@ async function getPublicLocation() {
                     });
                 },
                 (error) => {
-                    console.error("Geolocation error:", error);
+                    const errorMsg = window.getTranslation ? window.getTranslation('error-location') : 'Unable to get your location. Using default location.';
+                    showNotification(errorMsg, 'warning');
                     resolve(defaultLocation);
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
             );
         } else {
-            console.warn("Geolocation not supported");
+            const errorMsg = window.getTranslation ? window.getTranslation('error-location') : 'Unable to get your location. Using default location.';
+            showNotification(errorMsg, 'warning');
             resolve(defaultLocation);
         }
     });
 }
 
+function getCalculationMethodForLocation(latitude, longitude) {
+    // Simple region detection based on coordinates
+    if (latitude >= 24 && latitude <= 71 && longitude >= -168 && longitude <= -52) {
+        return '2'; // North America - ISNA
+    } else if (latitude >= 35 && latitude <= 71 && longitude >= -10 && longitude <= 40) {
+        return '3'; // Europe - MWL
+    } else if (latitude >= 12 && latitude <= 42 && longitude >= 34 && longitude <= 63) {
+        return '4'; // Middle East - Umm al-Qura
+    } else if (latitude >= -35 && latitude <= 37 && longitude >= -18 && longitude <= 52) {
+        return '5'; // Africa - Egyptian
+    } else if (latitude >= -10 && latitude <= 55 && longitude >= 60 && longitude <= 150) {
+        return '1'; // Asia - Karachi
+    }
+    return '4'; // Default to Umm al-Qura
+}
+
+/**
+ * Fetch with retry and timeout
+ */
+async function fetchWithRetry(url, { retries = 2, timeoutMs = 10000 } = {}) {
+    let lastErr;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const res = await fetch(url, { signal: controller.signal });
+            clearTimeout(t);
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+            return res;
+        } catch (e) {
+            clearTimeout(t);
+            lastErr = e;
+            if (attempt < retries) {
+                await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+            }
+        }
+    }
+    throw lastErr;
+}
+
+function isValidTimingsObject(timings) {
+    if (!timings || typeof timings !== 'object') return false;
+    const required = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    return required.every(k => typeof timings[k] === 'string' && /^\d{2}:\d{2}/.test(timings[k]));
+}
+
+function addMinutesToTimeString(timeStr, minutesToAdd) {
+    const match = /^\s*(\d{1,2}):(\d{2})/.exec(timeStr);
+    if (!match) return timeStr;
+    let h = Number(match[1]);
+    let m = Number(match[2]);
+    let total = h * 60 + m + minutesToAdd;
+    total = (total % (24 * 60) + (24 * 60)) % (24 * 60);
+    const hh = Math.floor(total / 60).toString().padStart(2, '0');
+    const mm = (total % 60).toString().padStart(2, '0');
+    return `${hh}:${mm}`;
+}
+
+function applyLocalAdjustments(timings) {
+    if (!isValidTimingsObject(timings)) return timings;
+    if (!timeAdjustmentMinutes) return timings;
+    const adjusted = { ...timings };
+    ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].forEach((k) => {
+        adjusted[k] = addMinutesToTimeString(adjusted[k], timeAdjustmentMinutes);
+    });
+    return adjusted;
+}
+
 async function getPrayerTimes(latitude, longitude, timezone) {
     try {
         // Use current date in YYYY-MM-DD format
+        const now = new Date();
         const dateStr = now.getFullYear() + '-' + 
                        (now.getMonth() + 1).toString().padStart(2, '0') + '-' + 
                        now.getDate().toString().padStart(2, '0');
         
-        const url = `https://api.aladhan.com/v1/timings/${dateStr}?latitude=${latitude}&longitude=${longitude}&method=4&timezonestring=${timezone}`;
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`API request failed with status ${response.status}`);
+        // Determine calculation method
+        let method = currentCalculationMethod;
+        if (method === 'auto') {
+            method = getCalculationMethodForLocation(latitude, longitude);
         }
-        
+
+        const params = new URLSearchParams({
+            latitude: String(latitude),
+            longitude: String(longitude),
+            method: String(method),
+            timezonestring: String(timezone),
+            school: String(asrSchool)
+        });
+
+        const url = `https://api.aladhan.com/v1/timings/${dateStr}?${params.toString()}`;
+        const response = await fetchWithRetry(url, { retries: 2, timeoutMs: 12000 });
         const data = await response.json();
-        
-        if (data.code === 200 && data.status === "OK") {
-            return data.data.timings;
-        } else {
-            throw new Error(data.data.error || 'Unknown API error');
+
+        // Basic API response validation
+        if (!data || data.code !== 200 || data.status !== 'OK' || !data.data || !data.data.timings) {
+            throw new Error('Invalid API response');
         }
+
+        const timings = data.data.timings;
+        if (!isValidTimingsObject(timings)) {
+            throw new Error('Invalid timings data');
+        }
+
+        return applyLocalAdjustments(timings);
     } catch (error) {
-        console.error('Error getting prayer times:', error);
-        
-        // Fallback prayer times for Bahrain
-        return {
+        logError('getPrayerTimes failed', { error: String(error) });
+        const errorMsg = window.getTranslation ? window.getTranslation('error-prayer-times') : 'Unable to load prayer times.';
+        showNotification(errorMsg, 'error');
+
+        return applyLocalAdjustments({
             Fajr: "05:00",
             Sunrise: "06:00",
             Dhuhr: "12:00",
             Asr: "15:00",
             Maghrib: "18:00",
             Isha: "19:30",
-        };
+        });
     }
 }
 
@@ -149,13 +443,16 @@ function gregorianToHijri(date) {
     
     if (hijriMonth > 12) hijriMonth -= 12;
     
-    const hijriMonthNames = [
-        "Muharram", "Safar", "Rabi al-Awwal", "Rabi al-Thani",
-        "Jumada al-Awwal", "Jumada al-Thani", "Rajab", "Shaban",
-        "Ramadan", "Shawwal", "Dhu al-Qadah", "Dhu al-Hijjah"
+    const hijriMonthKeys = [
+        'muharram','safar','rabi-al-awwal','rabi-al-thani',
+        'jumada-al-awwal','jumada-al-thani','rajab','shaban',
+        'ramadan','shawwal','dhu-al-qadah','dhu-al-hijjah'
     ];
-    
-    return `${hijriDay} ${hijriMonthNames[hijriMonth - 1]} ${hijriYear} AH`;
+
+    const key = hijriMonthKeys[hijriMonth - 1];
+    const monthName = window.getTranslation ? window.getTranslation(key) : key;
+
+    return `${hijriDay} ${monthName} ${hijriYear} AH`;
 }
 
 function calculateQibla(latitude, longitude) {
@@ -188,7 +485,7 @@ function getGMTOffset(timezone, latitude, longitude) {
                     return offsetPart.value.replace('GMT', 'GMT');
                 }
             } catch (e) {
-                console.log('Method 1 failed');
+                // Fallback to method 2
             }
         }
         
@@ -198,7 +495,7 @@ function getGMTOffset(timezone, latitude, longitude) {
                 const localDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
                 offsetMinutes = (localDate.getTime() - utcDate.getTime()) / (1000 * 60);
             } catch (e) {
-                console.log('Method 2 failed');
+                // Use default
             }
         }
         
@@ -216,7 +513,6 @@ function getGMTOffset(timezone, latitude, longitude) {
         
         return 'GMT+03'; // Default for Bahrain
     } catch (error) {
-        console.error('Error getting GMT offset:', error);
         return 'GMT+03';
     }
 }
@@ -300,15 +596,30 @@ function updateNextPrayer() {
     }
 }
 
-async function fetchData(city, country, latitude, longitude, timezone) {
+/**
+ * Fetch and display prayer times and related data
+ * @param {string} city - City name
+ * @param {string} country - Country name
+ * @param {number} latitude - Latitude coordinate
+ * @param {number} longitude - Longitude coordinate
+ * @param {string} timezone - Timezone string
+ * @param {boolean} showLoader - Whether to show loading overlay
+ */
+async function fetchData(city, country, latitude, longitude, timezone, showLoader = true) {
     try {
+        if (showLoader) showLoading();
+        
         const prayerTimes = await getPrayerTimes(latitude, longitude, timezone);
         if (!prayerTimes) throw new Error('Could not retrieve prayer times');
         
+        const now = new Date();
         const [currentPhase, illumination] = calculateMoonPhase();
         const hijriDate = gregorianToHijri(now);
         const gregorianDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const qiblaDirection = calculateQibla(latitude, longitude);
+        
+        lastUpdated = new Date();
+        updateStatusIndicator('Updated', !navigator.onLine);
         
         updateUI({
             city,
@@ -323,29 +634,25 @@ async function fetchData(city, country, latitude, longitude, timezone) {
             latitude,
             longitude
         });
+        
+        if (showLoader) hideLoading();
     } catch (error) {
-        console.error('Error fetching data:', error);
-        const errorDiv = document.createElement('div');
-        errorDiv.style.backgroundColor = '#ffdddd';
-        errorDiv.style.color = '#d00';
-        errorDiv.style.padding = '10px';
-        errorDiv.style.margin = '10px 0';
-        errorDiv.style.borderRadius = '8px';
-        errorDiv.textContent = `Error: ${error.message}. Using default prayer times for Bahrain.`;
+        if (showLoader) hideLoading();
         
-        const header = document.querySelector('.header');
-        if (header) {
-            header.parentNode.insertBefore(errorDiv, header.nextSibling);
+        const errorMsg = window.getTranslation ? window.getTranslation('error-general') : 'An error occurred. Please refresh the page.';
+        showNotification(errorMsg, 'error');
+        
+        // Fallback to default location (avoid infinite loop)
+        if (latitude !== defaultLocation.latitude || longitude !== defaultLocation.longitude) {
+            await fetchData(
+                defaultLocation.city,
+                defaultLocation.country,
+                defaultLocation.latitude,
+                defaultLocation.longitude,
+                defaultLocation.timezone,
+                false
+            );
         }
-        
-        // Fallback to default location
-        await fetchData(
-            defaultLocation.city,
-            defaultLocation.country,
-            defaultLocation.latitude,
-            defaultLocation.longitude,
-            defaultLocation.timezone
-        );
     }
 }
 
@@ -359,78 +666,466 @@ async function requestNotificationPermission() {
         notificationPermissionGranted = permission === "granted";
         return notificationPermissionGranted;
     } catch (error) {
-        console.error("Error requesting notification permission:", error);
+        logError('requestNotificationPermission failed', { error: String(error) });
         return false;
     }
 }
 
+function playNotificationSound() {
+    if (!notificationSoundEnabled) return;
+    
+    // Create a simple beep sound using Web Audio API
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (error) {
+        // Audio not supported or blocked
+    }
+}
+
 function sendPrayerNotification(prayerName) {
-    if (!notificationPermissionGranted) return;
+    if (!notificationPermissionGranted || !notificationsEnabled) return;
 
     try {
         new Notification("Prayer Time 🕌", {
             body: `It's time for ${prayerName} prayer!`,
             icon: '/static/sujud.svg',
-            tag: 'prayer-notification'
+            tag: 'prayer-notification',
+            requireInteraction: false
         });
+
+        playNotificationSound();
     } catch (error) {
-        console.error("Failed to show notification:", error);
+        logError('Notification failed', { error: String(error) });
     }
 }
 
 function checkPrayerTime() {
+    if (!notificationsEnabled) return;
+
     const now = new Date();
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
-    const fajrEl = document.querySelector('#fajr .time');
+
+    const fajrEl = DOMCache.prayerElements?.fajr?.querySelector('.time');
     if (!fajrEl || !fajrEl.textContent) return;
 
     const prayers = {
-        'Fajr': fajrEl.textContent,
-        'Dhuhr': document.querySelector('#dhuhr .time')?.textContent,
-        'Asr': document.querySelector('#asr .time')?.textContent,
-        'Maghrib': document.querySelector('#maghrib .time')?.textContent,
-        'Isha': document.querySelector('#isha .time')?.textContent
+        'Fajr': DOMCache.prayerElements?.fajr?.querySelector('.time')?.textContent,
+        'Dhuhr': DOMCache.prayerElements?.dhuhr?.querySelector('.time')?.textContent,
+        'Asr': DOMCache.prayerElements?.asr?.querySelector('.time')?.textContent,
+        'Maghrib': DOMCache.prayerElements?.maghrib?.querySelector('.time')?.textContent,
+        'Isha': DOMCache.prayerElements?.isha?.querySelector('.time')?.textContent
     };
 
     for (const [name, time] of Object.entries(prayers)) {
-        if (time && currentTime === time) {
-            sendPrayerNotification(name);
+        if (!time) continue;
+        const notifyTime = advanceNotificationMinutes ? addMinutesToTimeString(time, -advanceNotificationMinutes) : time;
+        if (currentTime === notifyTime) {
+            const label = advanceNotificationMinutes ? `${name} in ${advanceNotificationMinutes} min` : name;
+            sendPrayerNotification(label);
         }
     }
 }
 
-function setupTestButton() {
-    const notifyBtn = document.getElementById('notify-btn');
-    if (notifyBtn) {
-        notifyBtn.addEventListener('click', async () => {
+function debounce(fn, delayMs = 250) {
+    let t;
+    return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn(...args), delayMs);
+    };
+}
+
+function coerceNumberInRange(value, min, max, fallback) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+}
+
+function applyContrastSetting() {
+    if (highContrastEnabled) {
+        document.documentElement.setAttribute('data-contrast', 'high');
+    } else {
+        document.documentElement.removeAttribute('data-contrast');
+    }
+}
+
+function setupSettings() {
+    // Load saved settings
+    notificationsEnabled = localStorage.getItem('notificationsEnabled') === 'true';
+    notificationSoundEnabled = localStorage.getItem('notificationSound') === 'true';
+    advanceNotificationMinutes = coerceNumberInRange(localStorage.getItem('advanceNotificationMinutes') ?? '0', 0, 15, 0);
+    asrSchool = (localStorage.getItem('asrSchool') === '1') ? '1' : '0';
+    timeAdjustmentMinutes = coerceNumberInRange(localStorage.getItem('timeAdjustmentMinutes') ?? '0', -10, 10, 0);
+    highContrastEnabled = localStorage.getItem('highContrast') === 'true';
+
+    applyContrastSetting();
+
+    const notifCheckbox = document.getElementById('enable-notifications');
+    const soundCheckbox = document.getElementById('notification-sound');
+    const advanceSelect = document.getElementById('advance-notif');
+    const asrSelect = document.getElementById('asr-school');
+    const adjustSelect = document.getElementById('time-adjust');
+    const contrastCheckbox = document.getElementById('high-contrast');
+
+    if (notifCheckbox) notifCheckbox.checked = notificationsEnabled;
+    if (soundCheckbox) soundCheckbox.checked = notificationSoundEnabled;
+    if (advanceSelect) advanceSelect.value = String(advanceNotificationMinutes);
+    if (asrSelect) asrSelect.value = String(asrSchool);
+    if (adjustSelect) adjustSelect.value = String(timeAdjustmentMinutes);
+    if (contrastCheckbox) contrastCheckbox.checked = highContrastEnabled;
+
+    // Settings toggle
+    const settingsToggle = document.getElementById('settings-toggle');
+    const settingsPanel = document.getElementById('settings-panel');
+
+    if (settingsToggle && settingsPanel) {
+        settingsToggle.addEventListener('click', () => {
+            const isHidden = settingsPanel.hasAttribute('hidden');
+            if (isHidden) {
+                settingsPanel.removeAttribute('hidden');
+                settingsToggle.setAttribute('aria-expanded', 'true');
+            } else {
+                settingsPanel.setAttribute('hidden', '');
+                settingsToggle.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    const persist = debounce(() => {
+        localStorage.setItem('notificationsEnabled', String(notificationsEnabled));
+        localStorage.setItem('notificationSound', String(notificationSoundEnabled));
+        localStorage.setItem('advanceNotificationMinutes', String(advanceNotificationMinutes));
+        localStorage.setItem('asrSchool', String(asrSchool));
+        localStorage.setItem('timeAdjustmentMinutes', String(timeAdjustmentMinutes));
+        localStorage.setItem('highContrast', String(highContrastEnabled));
+    }, 200);
+
+    // Notification toggle
+    if (notifCheckbox) {
+        notifCheckbox.addEventListener('change', async (e) => {
+            notificationsEnabled = Boolean(e.target.checked);
+            persist();
+
+            if (notificationsEnabled && !notificationPermissionGranted) {
+                const granted = await requestNotificationPermission();
+                if (!granted) {
+                    notifCheckbox.checked = false;
+                    notificationsEnabled = false;
+                    persist();
+                    showNotification('Notification permission denied', 'warning');
+                }
+            }
+        });
+    }
+
+    // Sound toggle
+    if (soundCheckbox) {
+        soundCheckbox.addEventListener('change', (e) => {
+            notificationSoundEnabled = Boolean(e.target.checked);
+            persist();
+        });
+    }
+
+    if (advanceSelect) {
+        advanceSelect.addEventListener('change', (e) => {
+            advanceNotificationMinutes = coerceNumberInRange(e.target.value, 0, 15, 0);
+            persist();
+        });
+    }
+
+    if (asrSelect) {
+        asrSelect.addEventListener('change', async (e) => {
+            asrSchool = (e.target.value === '1') ? '1' : '0';
+            persist();
+            if (locationData) {
+                await fetchData(locationData.city, locationData.country, locationData.latitude, locationData.longitude, locationData.timezone, true);
+            }
+        });
+    }
+
+    if (adjustSelect) {
+        adjustSelect.addEventListener('change', async (e) => {
+            timeAdjustmentMinutes = coerceNumberInRange(e.target.value, -10, 10, 0);
+            persist();
+            if (locationData) {
+                await fetchData(locationData.city, locationData.country, locationData.latitude, locationData.longitude, locationData.timezone, true);
+            }
+        });
+    }
+
+    if (contrastCheckbox) {
+        contrastCheckbox.addEventListener('change', (e) => {
+            highContrastEnabled = Boolean(e.target.checked);
+            applyContrastSetting();
+            persist();
+        });
+    }
+
+    // Test notification button
+    const testBtn = document.getElementById('test-notification-btn');
+    if (testBtn) {
+        testBtn.addEventListener('click', async () => {
             if (!notificationPermissionGranted) {
                 await requestNotificationPermission();
             }
-            sendPrayerNotification("Test");
+            if (notificationsEnabled) {
+                sendPrayerNotification("Test");
+            } else {
+                showNotification('Enable notifications first', 'info');
+            }
+        });
+    }
+
+    // Share button
+    const shareBtn = document.getElementById('share-btn');
+    if (shareBtn) {
+        shareBtn.addEventListener('click', async () => {
+            try {
+                const text = buildShareText();
+                if (navigator.share) {
+                    await navigator.share({ title: 'Times & More', text });
+                } else {
+                    await navigator.clipboard.writeText(text);
+                    showNotification('Copied to clipboard', 'success');
+                }
+            } catch (e) {
+                showNotification('Unable to share', 'warning');
+            }
+        });
+    }
+
+    // Export iCal
+    const exportBtn = document.getElementById('export-ics-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            try {
+                const ics = buildIcsCalendar();
+                const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'prayer-times.ics';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                showNotification('Unable to export', 'warning');
+            }
+        });
+    }
+}
+
+let currentDate = new Date().toDateString();
+let locationData = null;
+
+function checkMidnight() {
+    const now = new Date();
+    const today = now.toDateString();
+    
+    if (today !== currentDate) {
+        currentDate = today;
+        
+        // Refresh prayer times with stored location data
+        if (locationData) {
+            fetchData(
+                locationData.city,
+                locationData.country,
+                locationData.latitude,
+                locationData.longitude,
+                locationData.timezone
+            );
+        }
+    }
+}
+
+let tickIntervalId = null;
+
+function startTicker() {
+    if (tickIntervalId) clearInterval(tickIntervalId);
+    tickIntervalId = setInterval(() => {
+        updateNextPrayer();
+        checkPrayerTime();
+        checkMidnight();
+    }, 60000);
+}
+
+let deferredPromptEvent = null;
+
+function setupPwaInstallPrompt() {
+    const installBtn = document.getElementById('install-btn');
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPromptEvent = e;
+        if (installBtn) {
+            installBtn.removeAttribute('hidden');
+        }
+    });
+
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPromptEvent) return;
+            deferredPromptEvent.prompt();
+            await deferredPromptEvent.userChoice;
+            deferredPromptEvent = null;
+            installBtn.setAttribute('hidden', '');
         });
     }
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
-    console.log("Initializing app...");
-    
     try {
-        const locationData = await getPublicLocation();
+        initDOMCache();
+        setupRefreshButton();
+        setupPwaInstallPrompt();
+
+        // Offline/online indicator
+        window.addEventListener('offline', () => updateStatusIndicator('Offline mode', true));
+        window.addEventListener('online', () => updateStatusIndicator('Back online', false));
+        // Load saved theme preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            currentTheme = savedTheme;
+            document.getElementById('theme-select').value = savedTheme;
+            applyTheme(savedTheme);
+        } else {
+            applyTheme('auto');
+        }
+        
+        // Listen for system theme changes when in auto mode
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (currentTheme === 'auto') {
+                applyTheme('auto');
+            }
+        });
+        
+        // Setup theme selector
+        document.getElementById('theme-select').addEventListener('change', function(e) {
+            currentTheme = e.target.value;
+            localStorage.setItem('theme', currentTheme);
+            applyTheme(currentTheme);
+        });
+        
+        // Load saved calculation method preference
+        const savedMethod = localStorage.getItem('calculationMethod');
+        if (savedMethod) {
+            currentCalculationMethod = savedMethod;
+            document.getElementById('calculation-select').value = savedMethod;
+        }
+        
+        showLoading();
+        locationData = await getPublicLocation();
         await fetchData(
             locationData.city,
             locationData.country,
             locationData.latitude,
             locationData.longitude,
-            locationData.timezone
+            locationData.timezone,
+            false
         );
+        hideLoading();
+        
+        // Setup calculation method selector
+        document.getElementById('calculation-select').addEventListener('change', async function(e) {
+            currentCalculationMethod = e.target.value;
+            localStorage.setItem('calculationMethod', currentCalculationMethod);
+            
+            // Refresh prayer times with new method
+            if (locationData) {
+                await fetchData(
+                    locationData.city,
+                    locationData.country,
+                    locationData.latitude,
+                    locationData.longitude,
+                    locationData.timezone
+                );
+            }
+        });
         
         await requestNotificationPermission();
-        setInterval(updateNextPrayer, 60000);
-        setInterval(checkPrayerTime, 60000);
-        setupTestButton();
+        setupSettings();
+        startTicker();
     } catch (error) {
-        console.error("Initialization error:", error);
+        logError('Initialization failed', { error: String(error) });
+        const errorMsg = window.getTranslation ? window.getTranslation('error-general') : 'Initialization failed. Please refresh.';
+        showNotification(errorMsg, 'error');
     }
-	console.log("App initialized successfully.");
 });
+
+function buildShareText() {
+    const city = DOMCache.locationDisplay?.textContent || '';
+    const times = {
+        Fajr: DOMCache.prayerElements?.fajr?.querySelector('.time')?.textContent,
+        Dhuhr: DOMCache.prayerElements?.dhuhr?.querySelector('.time')?.textContent,
+        Asr: DOMCache.prayerElements?.asr?.querySelector('.time')?.textContent,
+        Maghrib: DOMCache.prayerElements?.maghrib?.querySelector('.time')?.textContent,
+        Isha: DOMCache.prayerElements?.isha?.querySelector('.time')?.textContent
+    };
+    const lines = [
+        `Prayer times - ${city}`,
+        ...Object.entries(times).map(([k,v]) => `${k}: ${v || '--:--'}`),
+        `Generated by Times & More`
+    ];
+    return lines.join('\n');
+}
+
+function formatDateAsIcs(dt) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${dt.getUTCFullYear()}${pad(dt.getUTCMonth()+1)}${pad(dt.getUTCDate())}T${pad(dt.getUTCHours())}${pad(dt.getUTCMinutes())}${pad(dt.getUTCSeconds())}Z`;
+}
+
+function buildIcsCalendar() {
+    // Simple daily events for today only (export) using displayed times
+    const now = new Date();
+    const date = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0));
+    const city = DOMCache.locationDisplay?.textContent || 'Location';
+    const times = [
+        ['Fajr', DOMCache.prayerElements?.fajr?.querySelector('.time')?.textContent],
+        ['Dhuhr', DOMCache.prayerElements?.dhuhr?.querySelector('.time')?.textContent],
+        ['Asr', DOMCache.prayerElements?.asr?.querySelector('.time')?.textContent],
+        ['Maghrib', DOMCache.prayerElements?.maghrib?.querySelector('.time')?.textContent],
+        ['Isha', DOMCache.prayerElements?.isha?.querySelector('.time')?.textContent]
+    ];
+
+    const events = times
+        .filter(([,t]) => t && /^\d{2}:\d{2}/.test(t))
+        .map(([name, t], idx) => {
+            const [hh, mm] = t.split(':').map(Number);
+            const start = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0));
+            const end = new Date(start.getTime() + 20 * 60000);
+            const uid = `${now.getTime()}-${idx}@times-and-more`;
+            return [
+                'BEGIN:VEVENT',
+                `UID:${uid}`,
+                `DTSTAMP:${formatDateAsIcs(new Date())}`,
+                `DTSTART:${formatDateAsIcs(start)}`,
+                `DTEND:${formatDateAsIcs(end)}`,
+                `SUMMARY:${name} Prayer`,
+                `LOCATION:${city}`,
+                'END:VEVENT'
+            ].join('\r\n');
+        });
+
+    return [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Times & More//EN',
+        'CALSCALE:GREGORIAN',
+        ...events,
+        'END:VCALENDAR',
+        ''
+    ].join('\r\n');
+}

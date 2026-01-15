@@ -1,0 +1,45 @@
+{
+  "name": "Times & More - Prayer Times",
+  "short_name": "Times & More",
+  "description": "Islamic prayer times, Qibla direction, moon phase, and Hijri calendar",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#4CAF50",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/moon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/moon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Prayer Times",
+      "short_name": "Prayers",
+      "description": "Open prayer times",
+      "url": "/#prayers",
+      "icons": [{"src": "/static/sujud.svg", "sizes": "96x96", "type": "image/svg+xml"}]
+    },
+    {
+      "name": "Qibla",
+      "short_name": "Qibla",
+      "description": "Open Qibla compass",
+      "url": "/#qibla",
+      "icons": [{"src": "/static/sujud.svg", "sizes": "96x96", "type": "image/svg+xml"}]
+    }
+  ],
+  "categories": ["lifestyle", "utilities"],
+  "lang": "en"
+}
