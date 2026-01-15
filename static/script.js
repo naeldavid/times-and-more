@@ -20,12 +20,13 @@ const calculationMethodsByRegion = {
 
 let notificationPermissionGranted = false;
 let currentCalculationMethod = 'auto';
-let currentTheme = 'auto';
+let currentTheme = 'dark';
 let notificationsEnabled = false;
 let notificationSoundEnabled = false;
 let advanceNotificationMinutes = 0;
 let asrSchool = '0';
 let timeAdjustmentMinutes = 0;
+// High contrast removed (dark theme only)
 let highContrastEnabled = false;
 let isLoading = false;
 let lastUpdated = null;
@@ -179,20 +180,13 @@ function hideLoading() {
     isLoading = false;
 }
 
-function applyTheme(theme) {
-    if (theme === 'auto') {
-        // Check system preference
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-    } else {
-        document.documentElement.setAttribute('data-theme', theme);
-    }
-    
+function applyTheme() {
+    // Dark theme only
+    document.documentElement.setAttribute('data-theme', 'dark');
+
     // Update meta theme-color
-    const themeColor = theme === 'light' || (theme === 'auto' && !window.matchMedia('(prefers-color-scheme: dark)').matches) 
-        ? '#f5f5f5' 
-        : '#000000';
-    document.querySelector('meta[name="theme-color"]').setAttribute('content', themeColor);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', '#000000');
 }
 
 function showNotification(message, type = 'info') {
@@ -656,17 +650,31 @@ async function fetchData(city, country, latitude, longitude, timezone, showLoade
     }
 }
 
+function syncNotificationPermissionState() {
+    if (!('Notification' in window)) {
+        notificationPermissionGranted = false;
+        return false;
+    }
+    notificationPermissionGranted = (Notification.permission === 'granted');
+    return notificationPermissionGranted;
+}
+
 async function requestNotificationPermission() {
-    if (!("Notification" in window)) return false;
-    if (Notification.permission === "granted") return true;
-    if (Notification.permission === "denied") return false;
+    if (!('Notification' in window)) return false;
+
+    // Keep internal flag in sync
+    syncNotificationPermissionState();
+
+    if (Notification.permission === 'granted') return true;
+    if (Notification.permission === 'denied') return false;
 
     try {
         const permission = await Notification.requestPermission();
-        notificationPermissionGranted = permission === "granted";
+        notificationPermissionGranted = (permission === 'granted');
         return notificationPermissionGranted;
     } catch (error) {
         logError('requestNotificationPermission failed', { error: String(error) });
+        notificationPermissionGranted = false;
         return false;
     }
 }
@@ -696,24 +704,46 @@ function playNotificationSound() {
     }
 }
 
-function sendPrayerNotification(prayerName) {
-    if (!notificationPermissionGranted || !notificationsEnabled) return;
+let lastNotificationKey = null;
+
+async function sendPrayerNotification(prayerName) {
+    if (!notificationsEnabled) return;
+    if (!syncNotificationPermissionState()) return;
+
+    // De-dupe within the same minute to avoid repeats
+    const now = new Date();
+    const key = `${now.toDateString()}-${now.getHours()}:${now.getMinutes()}-${prayerName}`;
+    if (lastNotificationKey === key) return;
+    lastNotificationKey = key;
+
+    const title = 'Prayer Time';
+    const options = {
+        body: `It's time for ${prayerName} prayer!`,
+        icon: '/static/sujud.svg',
+        tag: 'prayer-notification',
+        requireInteraction: false
+    };
 
     try {
-        new Notification("Prayer Time 🕌", {
-            body: `It's time for ${prayerName} prayer!`,
-            icon: '/static/sujud.svg',
-            tag: 'prayer-notification',
-            requireInteraction: false
-        });
+        // Prefer SW notifications when available (more reliable for installed PWAs)
+        if ('serviceWorker' in navigator) {
+            const reg = await navigator.serviceWorker.ready;
+            if (reg && 'showNotification' in reg) {
+                await reg.showNotification(title, options);
+                playNotificationSound();
+                return;
+            }
+        }
 
+        // Fallback
+        new Notification(title, options);
         playNotificationSound();
     } catch (error) {
         logError('Notification failed', { error: String(error) });
     }
 }
 
-function checkPrayerTime() {
+async function checkPrayerTime() {
     if (!notificationsEnabled) return;
 
     const now = new Date();
@@ -735,7 +765,7 @@ function checkPrayerTime() {
         const notifyTime = advanceNotificationMinutes ? addMinutesToTimeString(time, -advanceNotificationMinutes) : time;
         if (currentTime === notifyTime) {
             const label = advanceNotificationMinutes ? `${name} in ${advanceNotificationMinutes} min` : name;
-            sendPrayerNotification(label);
+            await sendPrayerNotification(label);
         }
     }
 }
@@ -755,21 +785,21 @@ function coerceNumberInRange(value, min, max, fallback) {
 }
 
 function applyContrastSetting() {
-    if (highContrastEnabled) {
-        document.documentElement.setAttribute('data-contrast', 'high');
-    } else {
-        document.documentElement.removeAttribute('data-contrast');
-    }
+    // High contrast option removed; ensure attribute is not set.
+    document.documentElement.removeAttribute('data-contrast');
 }
 
 function setupSettings() {
     // Load saved settings
     notificationsEnabled = localStorage.getItem('notificationsEnabled') === 'true';
     notificationSoundEnabled = localStorage.getItem('notificationSound') === 'true';
+    syncNotificationPermissionState();
     advanceNotificationMinutes = coerceNumberInRange(localStorage.getItem('advanceNotificationMinutes') ?? '0', 0, 15, 0);
     asrSchool = (localStorage.getItem('asrSchool') === '1') ? '1' : '0';
     timeAdjustmentMinutes = coerceNumberInRange(localStorage.getItem('timeAdjustmentMinutes') ?? '0', -10, 10, 0);
-    highContrastEnabled = localStorage.getItem('highContrast') === 'true';
+    // High contrast removed
+    highContrastEnabled = false;
+    localStorage.removeItem('highContrast');
 
     applyContrastSetting();
 
@@ -778,14 +808,15 @@ function setupSettings() {
     const advanceSelect = document.getElementById('advance-notif');
     const asrSelect = document.getElementById('asr-school');
     const adjustSelect = document.getElementById('time-adjust');
-    const contrastCheckbox = document.getElementById('high-contrast');
+    // High contrast option removed
+    const contrastCheckbox = null;
 
     if (notifCheckbox) notifCheckbox.checked = notificationsEnabled;
     if (soundCheckbox) soundCheckbox.checked = notificationSoundEnabled;
     if (advanceSelect) advanceSelect.value = String(advanceNotificationMinutes);
     if (asrSelect) asrSelect.value = String(asrSchool);
     if (adjustSelect) adjustSelect.value = String(timeAdjustmentMinutes);
-    if (contrastCheckbox) contrastCheckbox.checked = highContrastEnabled;
+    // high contrast removed
 
     // Settings toggle
     const settingsToggle = document.getElementById('settings-toggle');
@@ -810,7 +841,7 @@ function setupSettings() {
         localStorage.setItem('advanceNotificationMinutes', String(advanceNotificationMinutes));
         localStorage.setItem('asrSchool', String(asrSchool));
         localStorage.setItem('timeAdjustmentMinutes', String(timeAdjustmentMinutes));
-        localStorage.setItem('highContrast', String(highContrastEnabled));
+        // highContrast removed
     }, 200);
 
     // Notification toggle
@@ -819,8 +850,10 @@ function setupSettings() {
             notificationsEnabled = Boolean(e.target.checked);
             persist();
 
-            if (notificationsEnabled && !notificationPermissionGranted) {
+            // Ensure we have permission if user enabled notifications
+            if (notificationsEnabled && !syncNotificationPermissionState()) {
                 const granted = await requestNotificationPermission();
+                syncNotificationPermissionState();
                 if (!granted) {
                     notifCheckbox.checked = false;
                     notificationsEnabled = false;
@@ -863,14 +896,6 @@ function setupSettings() {
             if (locationData) {
                 await fetchData(locationData.city, locationData.country, locationData.latitude, locationData.longitude, locationData.timezone, true);
             }
-        });
-    }
-
-    if (contrastCheckbox) {
-        contrastCheckbox.addEventListener('change', (e) => {
-            highContrastEnabled = Boolean(e.target.checked);
-            applyContrastSetting();
-            persist();
         });
     }
 
@@ -963,6 +988,52 @@ function startTicker() {
     }, 60000);
 }
 
+let autoRefreshIntervalId = null;
+
+function startAutoRefresh() {
+    if (autoRefreshIntervalId) clearInterval(autoRefreshIntervalId);
+
+    // Every 30 minutes, refresh data (same effect as pressing Refresh)
+    const intervalMs = 30 * 60 * 1000;
+    autoRefreshIntervalId = setInterval(async () => {
+        try {
+            // Skip if tab is not visible; we'll refresh on visibilitychange.
+            if (document.visibilityState !== 'visible') return;
+            if (isLoading || !locationData) return;
+            await fetchData(
+                locationData.city,
+                locationData.country,
+                locationData.latitude,
+                locationData.longitude,
+                locationData.timezone,
+                false
+            );
+        } catch (e) {
+            logError('Auto refresh failed', { error: String(e) });
+        }
+    }, intervalMs);
+
+    // Also refresh when returning to the tab after a while
+    document.addEventListener('visibilitychange', async () => {
+        try {
+            if (document.visibilityState !== 'visible') return;
+            if (isLoading || !locationData) return;
+            // If last update is older than 30 minutes, refresh now.
+            if (lastUpdated && (Date.now() - lastUpdated.getTime()) < intervalMs) return;
+            await fetchData(
+                locationData.city,
+                locationData.country,
+                locationData.latitude,
+                locationData.longitude,
+                locationData.timezone,
+                false
+            );
+        } catch (e) {
+            logError('Visibility refresh failed', { error: String(e) });
+        }
+    }, { passive: true });
+}
+
 let deferredPromptEvent = null;
 
 function setupPwaInstallPrompt() {
@@ -995,29 +1066,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Offline/online indicator
         window.addEventListener('offline', () => updateStatusIndicator('Offline mode', true));
         window.addEventListener('online', () => updateStatusIndicator('Back online', false));
-        // Load saved theme preference
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme) {
-            currentTheme = savedTheme;
-            document.getElementById('theme-select').value = savedTheme;
-            applyTheme(savedTheme);
-        } else {
-            applyTheme('auto');
-        }
-        
-        // Listen for system theme changes when in auto mode
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-            if (currentTheme === 'auto') {
-                applyTheme('auto');
-            }
-        });
-        
-        // Setup theme selector
-        document.getElementById('theme-select').addEventListener('change', function(e) {
-            currentTheme = e.target.value;
-            localStorage.setItem('theme', currentTheme);
-            applyTheme(currentTheme);
-        });
+        // Dark theme only
+        currentTheme = 'dark';
+        localStorage.setItem('theme', 'dark');
+        applyTheme();
         
         // Load saved calculation method preference
         const savedMethod = localStorage.getItem('calculationMethod');
@@ -1055,9 +1107,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         });
         
-        await requestNotificationPermission();
+        // Do not auto-prompt for notification permission on load.
+        // Just sync the internal permission state.
+        syncNotificationPermissionState();
+
         setupSettings();
         startTicker();
+        startAutoRefresh();
     } catch (error) {
         logError('Initialization failed', { error: String(error) });
         const errorMsg = window.getTranslation ? window.getTranslation('error-general') : 'Initialization failed. Please refresh.';

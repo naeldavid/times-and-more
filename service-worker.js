@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = 'times-and-more-v1';
+const CACHE_NAME = 'times-and-more-v2';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -35,6 +35,22 @@ self.addEventListener('activate', (event) => {
         })
     );
     return self.clients.claim();
+});
+
+// Handle notification clicks (focus/open the app)
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    event.waitUntil((async () => {
+        const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (const client of allClients) {
+            if ('focus' in client) {
+                return client.focus();
+            }
+        }
+        if (self.clients.openWindow) {
+            return self.clients.openWindow('/');
+        }
+    })());
 });
 
 // Fetch event - serve from cache when offline
