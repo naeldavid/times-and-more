@@ -378,7 +378,6 @@ body {
 	background: transparent;
 	border: 2px solid var(--green);
 	color: var(--text-color, white);
-	font-size: 1.5rem;
 	width: 45px;
 	height: 45px;
 	border-radius: 50%;
@@ -387,6 +386,10 @@ body {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+}
+
+.refresh-btn .refresh-icon {
+	display: block;
 }
 
 .refresh-btn:hover {

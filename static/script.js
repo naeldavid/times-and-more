@@ -650,33 +650,15 @@ async function fetchData(city, country, latitude, longitude, timezone, showLoade
     }
 }
 
+// Prayer notifications are handled as in-app toast messages (no OS/browser permission needed).
 function syncNotificationPermissionState() {
-    if (!('Notification' in window)) {
-        notificationPermissionGranted = false;
-        return false;
-    }
-    notificationPermissionGranted = (Notification.permission === 'granted');
-    return notificationPermissionGranted;
+    notificationPermissionGranted = true;
+    return true;
 }
 
 async function requestNotificationPermission() {
-    if (!('Notification' in window)) return false;
-
-    // Keep internal flag in sync
-    syncNotificationPermissionState();
-
-    if (Notification.permission === 'granted') return true;
-    if (Notification.permission === 'denied') return false;
-
-    try {
-        const permission = await Notification.requestPermission();
-        notificationPermissionGranted = (permission === 'granted');
-        return notificationPermissionGranted;
-    } catch (error) {
-        logError('requestNotificationPermission failed', { error: String(error) });
-        notificationPermissionGranted = false;
-        return false;
-    }
+    notificationPermissionGranted = true;
+    return true;
 }
 
 function playNotificationSound() {
@@ -708,7 +690,6 @@ let lastNotificationKey = null;
 
 async function sendPrayerNotification(prayerName) {
     if (!notificationsEnabled) return;
-    if (!syncNotificationPermissionState()) return;
 
     // De-dupe within the same minute to avoid repeats
     const now = new Date();
@@ -716,31 +697,8 @@ async function sendPrayerNotification(prayerName) {
     if (lastNotificationKey === key) return;
     lastNotificationKey = key;
 
-    const title = 'Prayer Time';
-    const options = {
-        body: `It's time for ${prayerName} prayer!`,
-        icon: '/static/sujud.svg',
-        tag: 'prayer-notification',
-        requireInteraction: false
-    };
-
-    try {
-        // Prefer SW notifications when available (more reliable for installed PWAs)
-        if ('serviceWorker' in navigator) {
-            const reg = await navigator.serviceWorker.ready;
-            if (reg && 'showNotification' in reg) {
-                await reg.showNotification(title, options);
-                playNotificationSound();
-                return;
-            }
-        }
-
-        // Fallback
-        new Notification(title, options);
-        playNotificationSound();
-    } catch (error) {
-        logError('Notification failed', { error: String(error) });
-    }
+    showNotification(`Prayer time: ${prayerName}`, 'info');
+    playNotificationSound();
 }
 
 async function checkPrayerTime() {
@@ -850,17 +808,8 @@ function setupSettings() {
             notificationsEnabled = Boolean(e.target.checked);
             persist();
 
-            // Ensure we have permission if user enabled notifications
-            if (notificationsEnabled && !syncNotificationPermissionState()) {
-                const granted = await requestNotificationPermission();
-                syncNotificationPermissionState();
-                if (!granted) {
-                    notifCheckbox.checked = false;
-                    notificationsEnabled = false;
-                    persist();
-                    showNotification('Notification permission denied', 'warning');
-                }
-            }
+            // In-app toast notifications: no OS permission flow required
+            syncNotificationPermissionState();
         });
     }
 
@@ -903,11 +852,8 @@ function setupSettings() {
     const testBtn = document.getElementById('test-notification-btn');
     if (testBtn) {
         testBtn.addEventListener('click', async () => {
-            if (!notificationPermissionGranted) {
-                await requestNotificationPermission();
-            }
             if (notificationsEnabled) {
-                sendPrayerNotification("Test");
+                await sendPrayerNotification("Test");
             } else {
                 showNotification('Enable notifications first', 'info');
             }
@@ -920,13 +866,29 @@ function setupSettings() {
         shareBtn.addEventListener('click', async () => {
             try {
                 const text = buildShareText();
+                const url = window.location?.href;
+
+                // Prefer Web Share API when available
                 if (navigator.share) {
-                    await navigator.share({ title: 'Times & More', text });
-                } else {
-                    await navigator.clipboard.writeText(text);
-                    showNotification('Copied to clipboard', 'success');
+                    await navigator.share({
+                        title: 'Times & More',
+                        text,
+                        url
+                    });
+                    return;
                 }
+
+                // Clipboard API only works in secure contexts (https / localhost)
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(url ? `${text}\n${url}` : text);
+                    showNotification('Copied to clipboard', 'success');
+                    return;
+                }
+
+                // Last resort: manual copy
+                window.prompt('Copy and share this text:', url ? `${text}\n${url}` : text);
             } catch (e) {
+                logError('Share failed', { error: String(e) });
                 showNotification('Unable to share', 'warning');
             }
         });
@@ -1107,8 +1069,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         });
         
-        // Do not auto-prompt for notification permission on load.
-        // Just sync the internal permission state.
+        // Toast notifications do not require OS permission.
         syncNotificationPermissionState();
 
         setupSettings();
