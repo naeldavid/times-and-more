@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = 'times-and-more-v2';
+const CACHE_NAME = 'times-and-more-v3';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -9,7 +9,8 @@ const urlsToCache = [
     '/static/languagesupport.js',
     '/static/favicon.ico',
     '/static/moon.png',
-    '/static/sujud.svg'
+    '/static/sujud.svg',
+    '/static/adhan.mp3'
 ];
 
 // Install event - cache assets
